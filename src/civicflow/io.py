@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from civicflow.analytics import SlaMetric
+from civicflow.analytics import BacklogMetric, SlaMetric
 from civicflow.model import ServiceCase
 
 
@@ -20,7 +20,7 @@ def write_cases_csv(cases: list[ServiceCase], destination: Path) -> None:
         writer.writerows(records)
 
 
-def write_report_json(metrics: list[SlaMetric], destination: Path) -> None:
+def write_report_json(metrics: list[SlaMetric] | list[BacklogMetric], destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("w", encoding="utf-8") as handle:
         json.dump([asdict(metric) for metric in metrics], handle, indent=2)

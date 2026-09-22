@@ -24,4 +24,12 @@ jobs:
       - run: pytest
       - name: Reproducible pipeline smoke test
         run: civicflow --cases 1000 --seed 20260922 --output-dir /tmp/civicflow
-
+      - name: Validate warehouse reconciliation
+        run: |
+          python - <<'PY'
+          import sqlite3
+          connection = sqlite3.connect('/tmp/civicflow/civicflow.db')
+          cases = connection.execute('SELECT COUNT(*) FROM dim_case').fetchone()[0]
+          states = connection.execute('SELECT COUNT(*) FROM current_case_state').fetchone()[0]
+          assert cases == states == 1000
+          PY

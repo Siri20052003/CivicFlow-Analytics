@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from datetime import UTC, datetime, timedelta
 
-from civicflow.model import SLA_HOURS, Department, Priority, ServiceCase, Status
+from civicflow.model import SLA_HOURS, CaseStatusEvent, Department, Priority, ServiceCase, Status
 
 SERVICE_CATALOG: dict[Department, tuple[str, ...]] = {
     Department.PUBLIC_WORKS: ("pothole", "street_light", "illegal_dumping"),
@@ -86,3 +86,36 @@ def generate_cases(
             )
         )
     return cases
+
+
+def generate_status_events(cases: list[ServiceCase], *, as_of: datetime) -> list[CaseStatusEvent]:
+    """Derive a deterministic, chronologically valid event stream from case snapshots."""
+    if as_of.tzinfo is None:
+        raise ValueError("as_of must be timezone-aware")
+    events: list[CaseStatusEvent] = []
+    paths = {
+        Status.OPEN: (Status.OPEN,),
+        Status.IN_PROGRESS: (Status.OPEN, Status.IN_PROGRESS),
+        Status.RESOLVED: (Status.OPEN, Status.IN_PROGRESS, Status.RESOLVED),
+        Status.CLOSED: (Status.OPEN, Status.IN_PROGRESS, Status.RESOLVED, Status.CLOSED),
+    }
+    for case in cases:
+        path = paths[case.status]
+        terminal_at = case.closed_at or min(
+            as_of,
+            case.opened_at + timedelta(hours=min(case.target_hours * 0.35, 12)),
+        )
+        span = terminal_at - case.opened_at
+        for position, status in enumerate(path):
+            fraction = position / max(1, len(path) - 1)
+            events.append(
+                CaseStatusEvent(
+                    event_id=f"{case.case_id}-E{position + 1:02d}",
+                    case_id=case.case_id,
+                    occurred_at=case.opened_at + span * fraction,
+                    from_status=path[position - 1] if position else None,
+                    to_status=status,
+                    assigned_team=case.assigned_team,
+                )
+            )
+    return events

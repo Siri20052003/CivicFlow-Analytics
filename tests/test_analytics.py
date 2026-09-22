@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from civicflow.analytics import build_sla_report
+from civicflow.analytics import build_backlog_report, build_sla_report
 from civicflow.synthetic import generate_cases
 from civicflow.validation import ValidationError, validate_cases
 
@@ -32,3 +32,25 @@ def test_validation_rejects_impossible_closure() -> None:
     invalid = replace(case, closed_at=case.opened_at.replace(year=2020))
     with pytest.raises(ValidationError, match="precedes opened_at"):
         validate_cases([invalid])
+
+
+def test_backlog_report_reconciles_active_cases_and_age_buckets() -> None:
+    cases = generate_cases(1_000, seed=42, as_of=AS_OF)
+    active_count = sum(case.closed_at is None for case in cases)
+    report = build_backlog_report(cases, as_of=AS_OF)
+    assert sum(metric.open_cases for metric in report) == active_count
+    assert all(
+        metric.open_cases
+        == metric.age_0_24_hours
+        + metric.age_25_72_hours
+        + metric.age_73_168_hours
+        + metric.age_over_168_hours
+        for metric in report
+    )
+    assert all(metric.currently_breached <= metric.open_cases for metric in report)
+
+
+def test_backlog_report_rejects_naive_as_of() -> None:
+    cases = generate_cases(2, seed=4, as_of=AS_OF)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        build_backlog_report(cases, as_of=datetime(2026, 9, 22))

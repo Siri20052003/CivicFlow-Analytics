@@ -69,3 +69,25 @@ class ServiceCase:
         record["opened_at"] = self.opened_at.astimezone(UTC).isoformat()
         record["closed_at"] = self.closed_at.astimezone(UTC).isoformat() if self.closed_at else ""
         return record
+
+
+@dataclass(frozen=True, slots=True)
+class CaseStatusEvent:
+    """An immutable transition in a service case lifecycle."""
+
+    event_id: str
+    case_id: str
+    occurred_at: datetime
+    from_status: Status | None
+    to_status: Status
+    assigned_team: str
+
+    def to_record(self) -> dict[str, Any]:
+        return {
+            "event_id": self.event_id,
+            "case_id": self.case_id,
+            "occurred_at": self.occurred_at.astimezone(UTC).isoformat(),
+            "from_status": str(self.from_status) if self.from_status else None,
+            "to_status": str(self.to_status),
+            "assigned_team": self.assigned_team,
+        }
