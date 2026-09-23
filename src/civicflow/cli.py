@@ -11,6 +11,7 @@ from civicflow.io import write_cases_csv, write_report_json
 from civicflow.synthetic import generate_cases, generate_status_events
 from civicflow.validation import validate_cases, validate_status_events
 from civicflow.warehouse import load_warehouse
+from civicflow.workflow import build_cohort_report, build_cycle_time_report
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -30,9 +31,13 @@ def main() -> None:
     events = generate_status_events(cases, as_of=as_of)
     validate_status_events(cases, events)
     backlog = build_backlog_report(cases, as_of=as_of)
+    cycle_time = build_cycle_time_report(cases, events)
+    cohorts = build_cohort_report(cases)
     write_cases_csv(cases, args.output_dir / "service_cases.csv")
     write_report_json(report, args.output_dir / "sla_report.json")
     write_report_json(backlog, args.output_dir / "backlog_report.json")
+    write_report_json(cycle_time, args.output_dir / "cycle_time_report.json")
+    write_report_json(cohorts, args.output_dir / "cohort_report.json")
     load_warehouse(args.output_dir / "civicflow.db", cases, events)
     closed = sum(metric.closed_cases for metric in report)
     print(

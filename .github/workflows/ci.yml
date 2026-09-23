@@ -33,3 +33,23 @@ jobs:
           states = connection.execute('SELECT COUNT(*) FROM current_case_state').fetchone()[0]
           assert cases == states == 1000
           PY
+      - name: Dashboard analytics smoke test
+        run: |
+          CIVICFLOW_DB=/tmp/civicflow/civicflow.db streamlit run src/civicflow/dashboard.py \
+            --server.headless=true --server.port=8501 &
+          dashboard_pid=$!
+          trap 'kill $dashboard_pid' EXIT
+          python - <<'PY'
+          import time
+          import urllib.request
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health') as response:
+                      assert response.read() == b'ok'
+                      break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise RuntimeError('dashboard failed health check')
+          PY
+      - run: docker build -f Dockerfile.dashboard -t civicflow-dashboard .

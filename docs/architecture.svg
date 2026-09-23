@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="360" viewBox="0 0 1100 360" role="img" aria-labelledby="title desc">
   <title id="title">CivicFlow Analytics architecture</title>
-  <desc id="desc">Synthetic civic cases and lifecycle events flow through validation into SLA analytics and a relational warehouse.</desc>
+  <desc id="desc">Synthetic civic cases and lifecycle events flow through validation into an operations warehouse, workflow analytics, and an interactive dashboard.</desc>
   <rect width="1100" height="360" rx="20" fill="#071a2b"/>
   <text x="55" y="55" fill="#f6f7fb" font-family="Arial" font-size="28" font-weight="700">CivicFlow Analytics</text>
   <text x="55" y="84" fill="#9fc7df" font-family="Arial" font-size="15">Auditable public-service operations pipeline</text>
   <g font-family="Arial" text-anchor="middle">
     <g transform="translate(50 125)"><rect width="210" height="125" rx="14" fill="#0d3551" stroke="#35b6d4" stroke-width="2"/><text x="105" y="45" fill="#fff" font-size="18" font-weight="700">Synthetic Intake</text><text x="105" y="75" fill="#b9dbea" font-size="14">Seeded service cases</text><text x="105" y="98" fill="#b9dbea" font-size="14">Lifecycle events</text></g>
     <g transform="translate(315 125)"><rect width="210" height="125" rx="14" fill="#123d49" stroke="#4ad9b1" stroke-width="2"/><text x="105" y="45" fill="#fff" font-size="18" font-weight="700">Data Contract</text><text x="105" y="75" fill="#c4eadf" font-size="14">Types + invariants</text><text x="105" y="98" fill="#c4eadf" font-size="14">Fail-fast validation</text></g>
-    <g transform="translate(580 125)"><rect width="210" height="125" rx="14" fill="#29385c" stroke="#8b9ff5" stroke-width="2"/><text x="105" y="45" fill="#fff" font-size="18" font-weight="700">Operations Analytics</text><text x="105" y="75" fill="#d5dcff" font-size="14">SLA outcomes + aging</text><text x="105" y="98" fill="#d5dcff" font-size="14">24-hour exposure</text></g>
-    <g transform="translate(845 125)"><rect width="210" height="125" rx="14" fill="#4a3149" stroke="#e299cf" stroke-width="2"/><text x="105" y="45" fill="#fff" font-size="18" font-weight="700">SQLite Warehouse</text><text x="105" y="75" fill="#f0d2e7" font-size="14">Case dimension + events</text><text x="105" y="98" fill="#f0d2e7" font-size="14">Current-state view</text></g>
+    <g transform="translate(580 125)"><rect width="210" height="125" rx="14" fill="#29385c" stroke="#8b9ff5" stroke-width="2"/><text x="105" y="38" fill="#fff" font-size="18" font-weight="700">SQLite Warehouse</text><text x="105" y="68" fill="#d5dcff" font-size="14">Case + event grains</text><text x="105" y="91" fill="#d5dcff" font-size="14">Current-state view</text><text x="105" y="110" fill="#d5dcff" font-size="14">Transactional refresh</text></g>
+    <g transform="translate(845 125)"><rect width="210" height="125" rx="14" fill="#4a3149" stroke="#e299cf" stroke-width="2"/><text x="105" y="38" fill="#fff" font-size="18" font-weight="700">Operations Console</text><text x="105" y="68" fill="#f0d2e7" font-size="14">SLA + backlog</text><text x="105" y="91" fill="#f0d2e7" font-size="14">Cycle time + cohorts</text><text x="105" y="110" fill="#f0d2e7" font-size="14">Explainable filters</text></g>
   </g>
   <g stroke="#8ab8ce" stroke-width="3" fill="none"><path d="M260 187h45"/><path d="M525 187h45"/><path d="M790 187h45"/></g>
   <g fill="#8ab8ce"><path d="M305 187l-10-7v14z"/><path d="M570 187l-10-7v14z"/><path d="M835 187l-10-7v14z"/></g>
-  <text x="550" y="315" text-anchor="middle" fill="#88a5b5" font-family="Arial" font-size="14">CLI · Docker · GitHub Actions · deterministic tests</text>
+  <text x="550" y="315" text-anchor="middle" fill="#88a5b5" font-family="Arial" font-size="14">CLI · Streamlit · Docker · GitHub Actions · deterministic tests</text>
 </svg>
