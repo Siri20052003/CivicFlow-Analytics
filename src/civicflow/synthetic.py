@@ -23,6 +23,21 @@ TEAM_BY_DEPARTMENT = {
     Department.TRANSPORTATION: ("Traffic-Ops", "Right-of-Way"),
 }
 
+# Synthetic workload and travel-complexity effects; they are not demographic proxies.
+DISTRICT_CASE_WEIGHTS = (12, 9, 13, 15, 10, 11, 7, 8, 9, 6)
+DISTRICT_DURATION_MULTIPLIERS = {
+    1: 0.92,
+    2: 0.88,
+    3: 1.18,
+    4: 1.04,
+    5: 0.96,
+    6: 1.12,
+    7: 0.86,
+    8: 0.90,
+    9: 1.24,
+    10: 1.08,
+}
+
 
 def generate_cases(
     count: int,
@@ -45,6 +60,7 @@ def generate_cases(
     for index in range(1, count + 1):
         department = rng.choice(departments)
         priority = rng.choices(priorities, weights=(3, 17, 50, 30), k=1)[0]
+        district = rng.choices(range(1, 11), weights=DISTRICT_CASE_WEIGHTS, k=1)[0]
         target = SLA_HOURS[priority]
         opened = as_of - timedelta(hours=rng.uniform(2, 24 * 120))
         is_closed = rng.random() < 0.82
@@ -52,7 +68,7 @@ def generate_cases(
         duration_factor = rng.lognormvariate(
             -0.18 if priority == Priority.CRITICAL else -0.05, 0.55
         )
-        elapsed = target * duration_factor
+        elapsed = target * duration_factor * DISTRICT_DURATION_MULTIPLIERS[district]
         closed = min(opened + timedelta(hours=elapsed), as_of) if is_closed else None
         if closed == as_of and opened + timedelta(hours=elapsed) > as_of:
             closed = None
@@ -77,7 +93,7 @@ def generate_cases(
                 channel=rng.choices(
                     ("web", "mobile", "phone", "field"), weights=(42, 28, 22, 8), k=1
                 )[0],
-                district=rng.randint(1, 10),
+                district=district,
                 status=status,
                 assigned_team=rng.choice(TEAM_BY_DEPARTMENT[department]),
                 target_hours=target,

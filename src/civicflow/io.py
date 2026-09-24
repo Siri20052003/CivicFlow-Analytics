@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from civicflow.analytics import BacklogMetric, SlaMetric
+from civicflow.geography import DistrictServiceMetric
 from civicflow.model import ServiceCase
 from civicflow.workflow import CohortMetric, CycleTimeMetric
 
@@ -22,7 +23,11 @@ def write_cases_csv(cases: list[ServiceCase], destination: Path) -> None:
 
 
 def write_report_json(
-    metrics: list[SlaMetric] | list[BacklogMetric] | list[CycleTimeMetric] | list[CohortMetric],
+    metrics: list[SlaMetric]
+    | list[BacklogMetric]
+    | list[CycleTimeMetric]
+    | list[CohortMetric]
+    | list[DistrictServiceMetric],
     destination: Path,
 ) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)

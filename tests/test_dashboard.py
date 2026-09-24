@@ -20,7 +20,7 @@ def test_dashboard_bootstrap_and_filtered_metrics(tmp_path) -> None:
     filtered_cases, filtered_events = filter_frames(
         cases, events, departments=[department], districts=[district]
     )
-    cycle, cohorts, kpis = build_dashboard_metrics(
+    cycle, cohorts, districts, kpis = build_dashboard_metrics(
         filtered_cases,
         filtered_events,
         as_of=datetime.now(UTC).replace(microsecond=0),
@@ -30,6 +30,8 @@ def test_dashboard_bootstrap_and_filtered_metrics(tmp_path) -> None:
     assert set(filtered_cases["district"]) == {district}
     assert not cycle.empty
     assert not cohorts.empty
+    assert len(districts) == 1
+    assert districts.iloc[0]["district"] == district
 
 
 def test_dashboard_bootstrap_preserves_existing_warehouse(tmp_path) -> None:

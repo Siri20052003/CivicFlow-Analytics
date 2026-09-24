@@ -7,6 +7,8 @@ CivicFlow Analytics is an original, production-style portfolio project for measu
 
 ![Architecture](docs/architecture.svg)
 
+![Synthetic district service map](docs/district-service-map.svg)
+
 ## Why this project exists
 
 Public-service dashboards are only credible when their operational definitions are clear. CivicFlow treats each metric as the output of a validated case ledger instead of starting with visualizations. The generator preserves realistic relationships between priority, SLA target, department, team, closure state, and satisfaction.
@@ -22,6 +24,8 @@ No real resident information is used. All records are synthetic and generated lo
 - Active-backlog aging buckets, current breaches, and 24-hour SLA exposure
 - Median and p90 first-action, active-work, and end-to-end resolution cycle times
 - Monthly intake cohorts that preserve open-case counts while reporting closed-case outcomes
+- District service-access metrics with fictional geospatial centroids and workload-normalized volume
+- Small-cohort suppression, 95% Wilson intervals, and uncertainty-aware benchmark flags
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
 - Interactive dashboard with department and district filters, operational KPIs, and cohort trends
 - Stable CSV case output and JSON metric output
@@ -46,6 +50,7 @@ Generated artifacts:
 - `data/generated/backlog_report.json`: active workload age and SLA exposure
 - `data/generated/cycle_time_report.json`: median and p90 workflow stage durations
 - `data/generated/cohort_report.json`: intake-month volume, outcomes, and compliance
+- `data/generated/district_service_report.json`: safeguarded district access and SLA metrics
 - `data/generated/civicflow.db`: relational case and lifecycle-event warehouse
 
 ## Interactive dashboard
@@ -57,7 +62,7 @@ streamlit run src/civicflow/dashboard.py
 
 Open `http://localhost:8501`. If the warehouse does not exist, the dashboard creates a deterministic 5,000-case demonstration dataset. Set `CIVICFLOW_DB=/path/to/civicflow.db` to use a mounted warehouse.
 
-The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods.
+The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons.
 
 ## Docker
 
@@ -89,15 +94,21 @@ Open cases are intentionally excluded from final SLA compliance because their ou
 
 Cycle time is split into `open → in_progress` first action and `in_progress → resolved` active work. The p90 uses the auditable nearest-rank definition. Intake cohorts are keyed by the month opened; open cases remain in cohort volume but are excluded from final compliance until an outcome exists.
 
+## District-analysis safeguards
+
+Districts are fictional operational areas with synthetic centroids and populations. They are not demographic groups or real municipal boundaries. CivicFlow reports case volume per 1,000 synthetic residents, but suppresses SLA outcome rates until a district has at least 30 closed cases. Published rates include 95% Wilson confidence intervals; a district is marked higher or lower than the citywide benchmark only when its full interval falls on one side of that benchmark.
+
+These controls reduce unstable rankings and discourage demographic conclusions that the dataset cannot support. A difference in service performance is a signal for operational investigation, not proof of inequity or causation.
+
 ## Roadmap
 
-- Add equity-safe and geospatial service-level analysis
 - Add downloadable filtered extracts and saved dashboard views
+- Add SLA-risk prediction with calibrated probabilities and drift monitoring
 - Add API ingestion, observability, load tests, and portfolio screenshots
 
 ## Responsible use
 
-Synthetic results are demonstrations, not claims about a real city or agency. The generator intentionally avoids names, addresses, coordinates, and demographic attributes. Any future equity analysis will document safeguards against misleading small-group comparisons.
+Synthetic results are demonstrations, not claims about a real city or agency. The generator intentionally avoids names, addresses, real boundaries, and demographic attributes. District-level comparisons measure operational access only and must not be interpreted as demographic fairness findings.
 
 ## License
 

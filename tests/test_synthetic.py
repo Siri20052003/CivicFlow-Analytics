@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import pytest
 
 from civicflow.model import SLA_HOURS
-from civicflow.synthetic import generate_cases
+from civicflow.synthetic import DISTRICT_DURATION_MULTIPLIERS, generate_cases
 from civicflow.validation import validate_cases
 
 AS_OF = datetime(2026, 9, 22, 12, tzinfo=UTC)
@@ -21,6 +21,7 @@ def test_generated_cases_follow_domain_contract() -> None:
     assert len({case.case_id for case in cases}) == 2_000
     assert all(case.target_hours == SLA_HOURS[case.priority] for case in cases)
     assert all(case.closed_at is None or case.closed_at <= AS_OF for case in cases)
+    assert {case.district for case in cases} == set(DISTRICT_DURATION_MULTIPLIERS)
 
 
 def test_count_must_be_positive() -> None:

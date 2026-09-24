@@ -27,11 +27,19 @@ jobs:
       - name: Validate warehouse reconciliation
         run: |
           python - <<'PY'
+          import json
           import sqlite3
           connection = sqlite3.connect('/tmp/civicflow/civicflow.db')
           cases = connection.execute('SELECT COUNT(*) FROM dim_case').fetchone()[0]
           states = connection.execute('SELECT COUNT(*) FROM current_case_state').fetchone()[0]
           assert cases == states == 1000
+          with open('/tmp/civicflow/district_service_report.json') as handle:
+              districts = json.load(handle)
+          assert len(districts) == 10
+          for district in districts:
+              if district['compliance_rate'] is not None:
+                  assert district['confidence_lower'] <= district['compliance_rate']
+                  assert district['compliance_rate'] <= district['confidence_upper']
           PY
       - name: Dashboard analytics smoke test
         run: |

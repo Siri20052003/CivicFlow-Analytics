@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
+from civicflow.geography import MIN_CLOSED_CASES, district_metric_from_counts
 from civicflow.synthetic import generate_cases, generate_status_events
 from civicflow.warehouse import load_warehouse
 
@@ -57,7 +59,7 @@ def filter_frames(
 
 def build_dashboard_metrics(
     cases: pd.DataFrame, events: pd.DataFrame, *, as_of: datetime
-) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, float | int]]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, float | int]]:
     """Calculate display metrics from filtered grains for testable UI behavior."""
     closed = cases[cases["closed_at"].notna()].copy()
     closed["resolution_hours"] = (
@@ -103,13 +105,28 @@ def build_dashboard_metrics(
         )
         .round({"compliance_rate": 4, "median_resolution_hours": 2})
     )
+
+    citywide_rate = float(closed["met_sla"].mean()) if len(closed) else 0.0
+    district_metrics = []
+    for district, rows in cases.groupby("district"):
+        district_closed = closed[closed["district"] == district]
+        district_metrics.append(
+            district_metric_from_counts(
+                int(district),
+                total_cases=len(rows),
+                closed_cases=len(district_closed),
+                compliant_cases=int(district_closed["met_sla"].sum()),
+                citywide_compliance_rate=citywide_rate,
+            )
+        )
+    districts = pd.DataFrame([asdict(metric) for metric in district_metrics])
     kpis: dict[str, float | int] = {
         "total_cases": len(cases),
         "open_cases": len(active),
         "current_breaches": int(active["breached"].sum()),
         "compliance_rate": round(float(closed["met_sla"].mean()), 4) if len(closed) else 0.0,
     }
-    return cycle, cohorts, kpis
+    return cycle, cohorts, districts, kpis
 
 
 def render() -> None:
@@ -134,7 +151,9 @@ def render() -> None:
         return
 
     as_of = datetime.now(UTC).replace(microsecond=0)
-    cycle, cohorts, kpis = build_dashboard_metrics(filtered_cases, filtered_events, as_of=as_of)
+    cycle, cohorts, district_metrics, kpis = build_dashboard_metrics(
+        filtered_cases, filtered_events, as_of=as_of
+    )
     columns = st.columns(4)
     columns[0].metric("Cases", f"{kpis['total_cases']:,}")
     columns[1].metric("Open backlog", f"{kpis['open_cases']:,}")
@@ -155,11 +174,43 @@ def render() -> None:
     st.line_chart(cohort_chart)
     st.dataframe(cohorts, width="stretch", hide_index=True)
 
+    st.subheader("District service access")
+    st.caption(
+        "Fictional district geography. Outcome rates are hidden for cohorts with fewer than "
+        f"{MIN_CLOSED_CASES} closed cases."
+    )
+    st.map(
+        district_metrics,
+        latitude="latitude",
+        longitude="longitude",
+        size="total_cases",
+        zoom=10,
+    )
+    published = district_metrics[district_metrics["compliance_rate"].notna()]
+    if not published.empty:
+        st.bar_chart(published.set_index("district_name")["compliance_rate"])
+    district_table = district_metrics[
+        [
+            "district",
+            "district_name",
+            "total_cases",
+            "closed_cases",
+            "cases_per_1000_residents",
+            "compliance_rate",
+            "confidence_lower",
+            "confidence_upper",
+            "comparison",
+            "suppression_reason",
+        ]
+    ]
+    st.dataframe(district_table, width="stretch", hide_index=True)
+
     with st.expander("Metric guardrails"):
         st.markdown(
             "Closed-case compliance excludes open cases. Current breaches compare active age "
             "with the case priority target. Cycle time requires open, in-progress, and "
-            "resolved events."
+            "resolved events. District comparisons use 95% Wilson intervals and never infer "
+            "demographic fairness from geography."
         )
 
 

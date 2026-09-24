@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520" role="img" aria-labelledby="title desc">
+  <title id="title">CivicFlow synthetic district service map</title>
+  <desc id="desc">A portfolio illustration of ten fictional service districts and the statistical safeguards applied to their outcome metrics.</desc>
+  <rect width="1100" height="520" rx="20" fill="#071a2b"/>
+  <text x="50" y="55" fill="#f7fafc" font-family="Arial" font-size="28" font-weight="700">District service access</text>
+  <text x="50" y="84" fill="#9fc7df" font-family="Arial" font-size="15">Fictional geography · operational signals · uncertainty-aware comparisons</text>
+  <g transform="translate(50 115)">
+    <rect width="650" height="350" rx="18" fill="#0b263a" stroke="#244d62"/>
+    <g stroke="#244d62" stroke-width="2" fill="none" opacity="0.8">
+      <path d="M70 80L205 50L315 105L465 65L570 125L520 240L390 300L250 265L115 305L70 190Z"/>
+      <path d="M205 50L225 160L70 190M315 105L225 160L250 265M465 65L430 175L570 125M430 175L520 240M225 160L430 175M250 265L390 300L430 175"/>
+    </g>
+    <g font-family="Arial" text-anchor="middle">
+      <g transform="translate(205 50)"><circle r="24" fill="#35b6d4"/><text y="5" fill="#061824" font-size="14" font-weight="700">D1</text></g>
+      <g transform="translate(315 105)"><circle r="20" fill="#4ad9b1"/><text y="5" fill="#061824" font-size="14" font-weight="700">D2</text></g>
+      <g transform="translate(465 65)"><circle r="28" fill="#f0b35a"/><text y="5" fill="#241505" font-size="14" font-weight="700">D3</text></g>
+      <g transform="translate(225 160)"><circle r="31" fill="#8b9ff5"/><text y="5" fill="#07122e" font-size="14" font-weight="700">D4</text></g>
+      <g transform="translate(430 175)"><circle r="23" fill="#35b6d4"/><text y="5" fill="#061824" font-size="14" font-weight="700">D5</text></g>
+      <g transform="translate(570 125)"><circle r="25" fill="#e299cf"/><text y="5" fill="#2b0b22" font-size="14" font-weight="700">D6</text></g>
+      <g transform="translate(70 190)"><circle r="18" fill="#4ad9b1"/><text y="5" fill="#061824" font-size="14" font-weight="700">D7</text></g>
+      <g transform="translate(250 265)"><circle r="20" fill="#35b6d4"/><text y="5" fill="#061824" font-size="14" font-weight="700">D8</text></g>
+      <g transform="translate(520 240)"><circle r="22" fill="#f0b35a"/><text y="5" fill="#241505" font-size="14" font-weight="700">D9</text></g>
+      <g transform="translate(390 300)"><circle r="17" fill="#8b9ff5"/><text y="5" fill="#07122e" font-size="14" font-weight="700">D10</text></g>
+    </g>
+    <text x="325" y="338" text-anchor="middle" fill="#88a5b5" font-family="Arial" font-size="13">Marker size represents synthetic case volume</text>
+  </g>
+  <g transform="translate(745 125)" font-family="Arial">
+    <rect width="305" height="330" rx="18" fill="#102d40" stroke="#315a70"/>
+    <text x="25" y="42" fill="#f7fafc" font-size="20" font-weight="700">Publication guardrails</text>
+    <circle cx="35" cy="85" r="8" fill="#4ad9b1"/><text x="55" y="90" fill="#d8edf5" font-size="14">Minimum 30 closed cases</text>
+    <circle cx="35" cy="130" r="8" fill="#35b6d4"/><text x="55" y="135" fill="#d8edf5" font-size="14">95% Wilson intervals</text>
+    <circle cx="35" cy="175" r="8" fill="#8b9ff5"/><text x="55" y="180" fill="#d8edf5" font-size="14">Uncertainty-aware flags</text>
+    <circle cx="35" cy="220" r="8" fill="#e299cf"/><text x="55" y="225" fill="#d8edf5" font-size="14">No demographic inference</text>
+    <line x1="25" y1="255" x2="280" y2="255" stroke="#315a70"/>
+    <text x="25" y="285" fill="#9fc7df" font-size="13">Signals guide operational review;</text>
+    <text x="25" y="307" fill="#9fc7df" font-size="13">they do not establish causation.</text>
+  </g>
+</svg>
