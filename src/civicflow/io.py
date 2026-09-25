@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
 from civicflow.analytics import BacklogMetric, SlaMetric
@@ -33,4 +33,14 @@ def write_report_json(
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("w", encoding="utf-8") as handle:
         json.dump([asdict(metric) for metric in metrics], handle, indent=2)
+        handle.write("\n")
+
+
+def write_dataclass_json(value: object, destination: Path) -> None:
+    """Serialize a dataclass report with a stable trailing newline."""
+    if not is_dataclass(value) or isinstance(value, type):
+        raise TypeError("value must be a dataclass instance")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("w", encoding="utf-8") as handle:
+        json.dump(asdict(value), handle, indent=2)
         handle.write("\n")

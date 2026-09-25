@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from civicflow.dashboard import (
     build_dashboard_metrics,
+    build_risk_view,
     ensure_demo_database,
     filter_frames,
     load_dashboard_frames,
@@ -32,6 +33,11 @@ def test_dashboard_bootstrap_and_filtered_metrics(tmp_path) -> None:
     assert not cohorts.empty
     assert len(districts) == 1
     assert districts.iloc[0]["district"] == district
+
+    prediction, scores, effects = build_risk_view(cases, filtered_cases)
+    assert prediction.test_cases > 0
+    assert scores["risk_probability"].between(0, 1).all()
+    assert not effects.empty
 
 
 def test_dashboard_bootstrap_preserves_existing_warehouse(tmp_path) -> None:

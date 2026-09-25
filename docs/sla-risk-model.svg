@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title description">
+  <title id="title">CivicFlow SLA risk model lifecycle</title>
+  <description id="description">Intake features flow through chronological training, probability calibration, holdout evaluation, and an operational risk queue.</description>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#172554"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#60a5fa"/>
+    </marker>
+    <style>
+      .heading { font: 700 30px system-ui, sans-serif; fill: #f8fafc; }
+      .subtitle { font: 400 16px system-ui, sans-serif; fill: #bfdbfe; }
+      .label { font: 700 17px system-ui, sans-serif; fill: #f8fafc; }
+      .copy { font: 400 14px system-ui, sans-serif; fill: #cbd5e1; }
+      .small { font: 600 13px system-ui, sans-serif; fill: #93c5fd; }
+      .card { fill: #1e293b; stroke: #3b82f6; stroke-width: 2; rx: 16; }
+      .arrow { stroke: #60a5fa; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="520" fill="url(#background)" rx="24"/>
+  <text x="60" y="65" class="heading">Leakage-safe SLA breach prediction</text>
+  <text x="60" y="96" class="subtitle">Chronology, calibration, explainability, and drift checks built into one reproducible pipeline</text>
+
+  <rect x="55" y="155" width="205" height="190" class="card"/>
+  <text x="80" y="194" class="label">Intake features</text>
+  <text x="80" y="228" class="copy">Department · service type</text>
+  <text x="80" y="254" class="copy">Priority · channel · district</text>
+  <text x="80" y="280" class="copy">Opening hour · weekday</text>
+  <text x="80" y="319" class="small">Outcome fields excluded</text>
+
+  <path d="M270 250 H325" class="arrow"/>
+  <rect x="335" y="135" width="230" height="230" class="card"/>
+  <text x="360" y="175" class="label">Chronological split</text>
+  <rect x="360" y="205" width="108" height="36" rx="8" fill="#2563eb"/>
+  <text x="381" y="229" class="copy">60% train</text>
+  <rect x="360" y="251" width="145" height="36" rx="8" fill="#7c3aed"/>
+  <text x="380" y="275" class="copy">20% calibrate</text>
+  <rect x="360" y="297" width="180" height="36" rx="8" fill="#0f766e"/>
+  <text x="380" y="321" class="copy">20% newest test</text>
+
+  <path d="M575 250 H630" class="arrow"/>
+  <rect x="640" y="155" width="205" height="190" class="card"/>
+  <text x="665" y="194" class="label">Calibrated model</text>
+  <text x="665" y="228" class="copy">Balanced logistic score</text>
+  <text x="665" y="254" class="copy">Platt probability scaling</text>
+  <text x="665" y="280" class="copy">Ranked feature effects</text>
+  <text x="665" y="319" class="small">Serializable pipeline</text>
+
+  <path d="M855 250 H910" class="arrow"/>
+  <rect x="920" y="135" width="225" height="230" class="card"/>
+  <text x="945" y="175" class="label">Operational controls</text>
+  <text x="945" y="213" class="copy">Holdout discrimination</text>
+  <text x="945" y="239" class="copy">Brier + calibration error</text>
+  <text x="945" y="265" class="copy">Risk distribution PSI</text>
+  <text x="945" y="291" class="copy">Open-case risk queue</text>
+  <text x="945" y="329" class="small">Human decision support</text>
+
+  <rect x="55" y="413" width="1090" height="58" rx="14" fill="#0f172a" stroke="#334155"/>
+  <text x="80" y="448" class="copy">Guardrail: probabilities inform workload planning; they never automatically change priority, assignment, or resident service.</text>
+</svg>

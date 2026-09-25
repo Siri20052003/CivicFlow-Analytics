@@ -23,16 +23,19 @@ jobs:
       - run: ruff format --check .
       - run: pytest
       - name: Reproducible pipeline smoke test
-        run: civicflow --cases 1000 --seed 20260922 --output-dir /tmp/civicflow
+        run: civicflow --cases 5000 --seed 20260922 --output-dir /tmp/civicflow
       - name: Validate warehouse reconciliation
         run: |
           python - <<'PY'
           import json
           import sqlite3
+          from pathlib import Path
+          import joblib
+          import pandas as pd
           connection = sqlite3.connect('/tmp/civicflow/civicflow.db')
           cases = connection.execute('SELECT COUNT(*) FROM dim_case').fetchone()[0]
           states = connection.execute('SELECT COUNT(*) FROM current_case_state').fetchone()[0]
-          assert cases == states == 1000
+          assert cases == states == 5000
           with open('/tmp/civicflow/district_service_report.json') as handle:
               districts = json.load(handle)
           assert len(districts) == 10
@@ -40,6 +43,16 @@ jobs:
               if district['compliance_rate'] is not None:
                   assert district['confidence_lower'] <= district['compliance_rate']
                   assert district['compliance_rate'] <= district['confidence_upper']
+          with open('/tmp/civicflow/sla_prediction_report.json') as handle:
+              prediction = json.load(handle)
+          assert 0.5 <= prediction['roc_auc'] <= 1
+          assert prediction['training_period_end'] < prediction['test_period_start']
+          assert prediction['drift_level'] in {'stable', 'watch', 'action_required'}
+          scores = pd.read_csv('/tmp/civicflow/open_case_risk_scores.csv')
+          assert scores['risk_probability'].between(0, 1).all()
+          assert scores['risk_probability'].is_monotonic_decreasing
+          assert Path('/tmp/civicflow/sla_risk_model.joblib').stat().st_size > 0
+          assert hasattr(joblib.load('/tmp/civicflow/sla_risk_model.joblib'), 'predict_proba')
           PY
       - name: Dashboard analytics smoke test
         run: |

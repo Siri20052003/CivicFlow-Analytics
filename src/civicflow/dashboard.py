@@ -12,6 +12,11 @@ import pandas as pd
 import streamlit as st
 
 from civicflow.geography import MIN_CLOSED_CASES, district_metric_from_counts
+from civicflow.prediction import (
+    PredictionReport,
+    score_open_cases_frame,
+    train_sla_risk_model_frame,
+)
 from civicflow.synthetic import generate_cases, generate_status_events
 from civicflow.warehouse import load_warehouse
 
@@ -129,6 +134,16 @@ def build_dashboard_metrics(
     return cycle, cohorts, districts, kpis
 
 
+def build_risk_view(
+    all_cases: pd.DataFrame, filtered_cases: pd.DataFrame
+) -> tuple[PredictionReport, pd.DataFrame, pd.DataFrame]:
+    """Train on the full history, then rank only the currently selected open cases."""
+    model, report = train_sla_risk_model_frame(all_cases)
+    scores = score_open_cases_frame(filtered_cases, model, limit=100)
+    effects = pd.DataFrame([asdict(effect) for effect in report.top_feature_effects])
+    return report, scores, effects
+
+
 def render() -> None:
     st.set_page_config(page_title="CivicFlow Operations", page_icon="🏙️", layout="wide")
     st.title("CivicFlow Operations Console")
@@ -159,6 +174,37 @@ def render() -> None:
     columns[1].metric("Open backlog", f"{kpis['open_cases']:,}")
     columns[2].metric("Current SLA breaches", f"{kpis['current_breaches']:,}")
     columns[3].metric("Closed-case compliance", f"{kpis['compliance_rate']:.1%}")
+
+    st.subheader("SLA breach risk")
+    st.caption(
+        "Calibrated intake-time probabilities support workload planning; they do not "
+        "automatically change case priority or assignment."
+    )
+    prediction, risk_scores, feature_effects = build_risk_view(cases, filtered_cases)
+    risk_columns = st.columns(4)
+    risk_columns[0].metric("Holdout ROC AUC", f"{prediction.roc_auc:.3f}")
+    risk_columns[1].metric("Brier score", f"{prediction.brier_score:.3f}")
+    risk_columns[2].metric("Calibration error", f"{prediction.expected_calibration_error:.3f}")
+    risk_columns[3].metric(
+        "Risk drift",
+        prediction.drift_level.replace("_", " ").title(),
+        help=f"Population stability index: {prediction.risk_population_stability_index:.3f}",
+    )
+    if risk_scores.empty:
+        st.info("No open cases match the selected filters.")
+    else:
+        st.bar_chart(risk_scores["risk_band"].value_counts())
+        risk_table = risk_scores.copy()
+        risk_table["risk_probability"] = risk_table["risk_probability"].map(
+            lambda value: f"{value:.1%}"
+        )
+        st.dataframe(risk_table, width="stretch", hide_index=True)
+    with st.expander("Model drivers and validation"):
+        st.caption(
+            "Positive coefficients indicate higher modeled risk. The newest chronological "
+            "20% of closed cases is reserved for final evaluation."
+        )
+        st.dataframe(feature_effects, width="stretch", hide_index=True)
 
     st.subheader("Workflow cycle time")
     cycle_chart = cycle.set_index("department")[
@@ -210,7 +256,8 @@ def render() -> None:
             "Closed-case compliance excludes open cases. Current breaches compare active age "
             "with the case priority target. Cycle time requires open, in-progress, and "
             "resolved events. District comparisons use 95% Wilson intervals and never infer "
-            "demographic fairness from geography."
+            "demographic fairness from geography. SLA risk uses only fields known at intake; "
+            "closure, satisfaction, current status, and elapsed-resolution fields are excluded."
         )
 
 

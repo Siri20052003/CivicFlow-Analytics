@@ -3,11 +3,13 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![CI](https://github.com/Siri20052003/CivicFlow-Analytics/actions/workflows/ci.yml/badge.svg)
 
-CivicFlow Analytics is an original, production-style portfolio project for measuring how municipal service teams manage resident requests. It combines realistic synthetic cases, explicit domain rules, immutable lifecycle history, a relational operations warehouse, reproducible SLA reporting, and an interactive operations console.
+CivicFlow Analytics is an original, production-style portfolio project for measuring how municipal service teams manage resident requests. It combines realistic synthetic cases, explicit domain rules, immutable lifecycle history, a relational operations warehouse, calibrated SLA-risk prediction, reproducible reporting, and an interactive operations console.
 
 ![Architecture](docs/architecture.svg)
 
 ![Synthetic district service map](docs/district-service-map.svg)
+
+![SLA risk model lifecycle](docs/sla-risk-model.svg)
 
 ## Why this project exists
 
@@ -26,8 +28,10 @@ No real resident information is used. All records are synthetic and generated lo
 - Monthly intake cohorts that preserve open-case counts while reporting closed-case outcomes
 - District service-access metrics with fictional geospatial centroids and workload-normalized volume
 - Small-cohort suppression, 95% Wilson intervals, and uncertainty-aware benchmark flags
+- Leakage-safe SLA-breach prediction with chronological train, calibration, and test windows
+- Calibrated probabilities, interpretable feature effects, top-decile recall, and drift monitoring
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
-- Interactive dashboard with department and district filters, operational KPIs, and cohort trends
+- Interactive dashboard with operational KPIs, cohort trends, and a filter-aware risk queue
 - Stable CSV case output and JSON metric output
 - Installable CLI, non-root Docker runtime, CI quality gates, and automated tests
 
@@ -51,6 +55,9 @@ Generated artifacts:
 - `data/generated/cycle_time_report.json`: median and p90 workflow stage durations
 - `data/generated/cohort_report.json`: intake-month volume, outcomes, and compliance
 - `data/generated/district_service_report.json`: safeguarded district access and SLA metrics
+- `data/generated/sla_prediction_report.json`: holdout discrimination, calibration, drift, and driver metrics
+- `data/generated/open_case_risk_scores.csv`: ranked, calibrated open-case risk queue
+- `data/generated/sla_risk_model.joblib`: fitted preprocessing, classifier, and calibration pipeline
 - `data/generated/civicflow.db`: relational case and lifecycle-event warehouse
 
 ## Interactive dashboard
@@ -62,7 +69,7 @@ streamlit run src/civicflow/dashboard.py
 
 Open `http://localhost:8501`. If the warehouse does not exist, the dashboard creates a deterministic 5,000-case demonstration dataset. Set `CIVICFLOW_DB=/path/to/civicflow.db` to use a mounted warehouse.
 
-The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons.
+The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons. The risk view ranks matching open cases by calibrated breach probability and displays holdout quality, calibration error, distribution drift, and interpretable model drivers.
 
 ## Docker
 
@@ -100,11 +107,19 @@ Districts are fictional operational areas with synthetic centroids and populatio
 
 These controls reduce unstable rankings and discourage demographic conclusions that the dataset cannot support. A difference in service performance is a signal for operational investigation, not proof of inequity or causation.
 
+## SLA-risk model governance
+
+The model predicts whether a closed case will exceed its SLA target, using only fields available at intake: department, service type, priority, channel, district, opening hour, and opening weekday. Closure time, current status, satisfaction, target duration, elapsed time, and lifecycle events are excluded from features to prevent outcome leakage.
+
+Closed cases are ordered by intake time, then divided into 60% training, 20% probability calibration, and 20% final test windows. A class-balanced logistic regression supplies explainable base scores; a separate Platt-scaling model calibrates those scores. The untouched newest window reports ROC AUC, average precision, Brier score, log loss, expected calibration error, and top-decile recall. Population stability index compares train and test risk distributions, with `stable` below 0.10, `watch` from 0.10 to 0.25, and `action_required` above 0.25.
+
+Predictions are decision support for workload planning, not automatic case priority or assignment. Feature coefficients describe modeled associations in synthetic data and do not establish causation. A production deployment should retrain on approved historical data, review calibration by service segment, monitor drift on every scoring period, and require human review of operational policy changes.
+
 ## Roadmap
 
-- Add downloadable filtered extracts and saved dashboard views
-- Add SLA-risk prediction with calibrated probabilities and drift monitoring
-- Add API ingestion, observability, load tests, and portfolio screenshots
+- Add scenario-based staffing forecasts and executive service-level targets
+- Add API ingestion, observability, load tests, and deployment guidance
+- Add downloadable filtered extracts and a polished executive briefing image
 
 ## Responsible use
 
