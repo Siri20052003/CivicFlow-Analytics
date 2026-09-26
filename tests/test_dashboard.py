@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from civicflow.dashboard import (
     build_dashboard_metrics,
     build_risk_view,
+    build_staffing_view,
     ensure_demo_database,
     filter_frames,
     load_dashboard_frames,
@@ -38,6 +39,17 @@ def test_dashboard_bootstrap_and_filtered_metrics(tmp_path) -> None:
     assert prediction.test_cases > 0
     assert scores["risk_probability"].between(0, 1).all()
     assert not effects.empty
+
+    staffing, staffing_table = build_staffing_view(
+        cases,
+        departments=[department],
+        demand_multiplier=1.0,
+        service_level_target=0.90,
+        shrinkage_rate=0.20,
+    )
+    assert staffing.current_fte > 0
+    assert staffing.required_fte > 0
+    assert list(staffing_table["department"]) == [department]
 
 
 def test_dashboard_bootstrap_preserves_existing_warehouse(tmp_path) -> None:

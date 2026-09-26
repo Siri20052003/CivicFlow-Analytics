@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title description">
+  <title id="title">CivicFlow executive staffing scenario planner</title>
+  <description id="description">A transparent planning flow from twelve complete weeks of arrivals through demand and service-level scenarios to department FTE gaps and annual cost impact.</description>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#082f49"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#67e8f9"/>
+    </marker>
+    <style>
+      .heading { font: 700 30px system-ui, sans-serif; fill: #f8fafc; }
+      .subtitle { font: 400 16px system-ui, sans-serif; fill: #bae6fd; }
+      .label { font: 700 18px system-ui, sans-serif; fill: #f8fafc; }
+      .copy { font: 400 14px system-ui, sans-serif; fill: #cbd5e1; }
+      .accent { font: 700 13px system-ui, sans-serif; fill: #67e8f9; }
+      .card { fill: #0f172a; stroke: #38bdf8; stroke-width: 2; rx: 18; }
+      .flow { fill: none; stroke: #67e8f9; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="560" rx="24" fill="url(#bg)"/>
+  <text x="60" y="65" class="heading">Executive staffing scenarios with auditable assumptions</text>
+  <text x="60" y="96" class="subtitle">Demand variability → service target → workload hours → FTE and cost decision support</text>
+
+  <rect x="55" y="155" width="220" height="220" class="card"/>
+  <text x="82" y="195" class="label">Observed demand</text>
+  <text x="82" y="232" class="copy">12 complete intake weeks</text>
+  <text x="82" y="260" class="copy">Mean arrivals by department</text>
+  <text x="82" y="288" class="copy">Weekly arrival volatility</text>
+  <text x="82" y="335" class="accent">Partial week excluded</text>
+
+  <path d="M285 265 H335" class="flow"/>
+  <rect x="345" y="135" width="230" height="260" class="card"/>
+  <text x="372" y="175" class="label">Scenario controls</text>
+  <text x="372" y="215" class="copy">Demand: 0.80× – 1.40×</text>
+  <text x="372" y="245" class="copy">Service target: 80% – 99%</text>
+  <text x="372" y="275" class="copy">Non-casework allowance</text>
+  <text x="372" y="305" class="copy">Scheduled hours per FTE</text>
+  <text x="372" y="335" class="copy">Loaded annual FTE cost</text>
+  <text x="372" y="370" class="accent">Every input is explicit</text>
+
+  <path d="M585 265 H635" class="flow"/>
+  <rect x="645" y="155" width="220" height="220" class="card"/>
+  <text x="672" y="195" class="label">Capacity model</text>
+  <text x="672" y="232" class="copy">Service-level demand buffer</text>
+  <text x="672" y="260" class="copy">Task-effort assumptions</text>
+  <text x="672" y="288" class="copy">Effective weekly capacity</text>
+  <text x="672" y="335" class="accent">No elapsed-time shortcut</text>
+
+  <path d="M875 265 H925" class="flow"/>
+  <rect x="935" y="135" width="215" height="260" class="card"/>
+  <text x="962" y="175" class="label">Executive outputs</text>
+  <text x="962" y="215" class="copy">Current vs. required FTE</text>
+  <text x="962" y="245" class="copy">Department capacity gap</text>
+  <text x="962" y="275" class="copy">Expected utilization</text>
+  <text x="962" y="305" class="copy">Annualized cost delta</text>
+  <text x="962" y="335" class="copy">Baseline / surge / assurance</text>
+  <text x="962" y="370" class="accent">Human review required</text>
+
+  <rect x="55" y="445" width="1095" height="65" rx="15" fill="#0f172a" stroke="#334155"/>
+  <text x="82" y="482" class="copy">Guardrail: replace synthetic effort and cost assumptions with approved workforce data before operational hiring or budget decisions.</text>
+</svg>

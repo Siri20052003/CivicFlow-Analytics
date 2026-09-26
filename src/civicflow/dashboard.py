@@ -17,6 +17,11 @@ from civicflow.prediction import (
     score_open_cases_frame,
     train_sla_risk_model_frame,
 )
+from civicflow.staffing import (
+    StaffingScenario,
+    StaffingScenarioReport,
+    build_staffing_scenario_frame,
+)
 from civicflow.synthetic import generate_cases, generate_status_events
 from civicflow.warehouse import load_warehouse
 
@@ -144,6 +149,26 @@ def build_risk_view(
     return report, scores, effects
 
 
+def build_staffing_view(
+    cases: pd.DataFrame,
+    *,
+    departments: list[str],
+    demand_multiplier: float,
+    service_level_target: float,
+    shrinkage_rate: float,
+) -> tuple[StaffingScenarioReport, pd.DataFrame]:
+    """Build a citywide staffing scenario for the selected departments."""
+    planning_cases = cases[cases["department"].isin(departments)].copy()
+    scenario = StaffingScenario(
+        name="Executive plan",
+        demand_multiplier=demand_multiplier,
+        service_level_target=service_level_target,
+        shrinkage_rate=shrinkage_rate,
+    )
+    report = build_staffing_scenario_frame(planning_cases, scenario)
+    return report, pd.DataFrame([asdict(item) for item in report.forecasts])
+
+
 def render() -> None:
     st.set_page_config(page_title="CivicFlow Operations", page_icon="🏙️", layout="wide")
     st.title("CivicFlow Operations Console")
@@ -157,6 +182,16 @@ def render() -> None:
     )
     districts = st.sidebar.multiselect(
         "Districts", sorted(cases["district"].unique()), default=sorted(cases["district"].unique())
+    )
+    st.sidebar.subheader("Staffing scenario")
+    demand_multiplier = st.sidebar.slider(
+        "Demand multiplier", min_value=0.80, max_value=1.40, value=1.00, step=0.05
+    )
+    service_level_target = st.sidebar.slider(
+        "Service-level target", min_value=0.80, max_value=0.99, value=0.90, step=0.01
+    )
+    shrinkage_rate = st.sidebar.slider(
+        "Non-casework time", min_value=0.00, max_value=0.40, value=0.20, step=0.05
     )
     filtered_cases, filtered_events = filter_frames(
         cases, events, departments=departments, districts=districts
@@ -174,6 +209,42 @@ def render() -> None:
     columns[1].metric("Open backlog", f"{kpis['open_cases']:,}")
     columns[2].metric("Current SLA breaches", f"{kpis['current_breaches']:,}")
     columns[3].metric("Closed-case compliance", f"{kpis['compliance_rate']:.1%}")
+
+    st.subheader("Executive staffing scenario")
+    st.caption(
+        "Citywide department demand using complete historical weeks, explicit task-effort "
+        "assumptions, and a configurable arrival buffer."
+    )
+    staffing, staffing_table = build_staffing_view(
+        cases,
+        departments=departments,
+        demand_multiplier=demand_multiplier,
+        service_level_target=service_level_target,
+        shrinkage_rate=shrinkage_rate,
+    )
+    staffing_columns = st.columns(4)
+    staffing_columns[0].metric("Current FTE", staffing.current_fte)
+    staffing_columns[1].metric("Required FTE", staffing.required_fte)
+    staffing_columns[2].metric("FTE gap", f"{staffing.fte_gap:+d}")
+    staffing_columns[3].metric("Annual cost delta", f"${staffing.annualized_cost_delta:,.0f}")
+    st.bar_chart(staffing_table.set_index("department")[["current_fte", "required_fte"]])
+    st.dataframe(
+        staffing_table[
+            [
+                "department",
+                "expected_weekly_cases",
+                "planning_weekly_cases",
+                "average_effort_hours",
+                "expected_utilization",
+                "current_fte",
+                "required_fte",
+                "fte_gap",
+                "capacity_status",
+            ]
+        ],
+        width="stretch",
+        hide_index=True,
+    )
 
     st.subheader("SLA breach risk")
     st.caption(

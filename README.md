@@ -3,13 +3,15 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![CI](https://github.com/Siri20052003/CivicFlow-Analytics/actions/workflows/ci.yml/badge.svg)
 
-CivicFlow Analytics is an original, production-style portfolio project for measuring how municipal service teams manage resident requests. It combines realistic synthetic cases, explicit domain rules, immutable lifecycle history, a relational operations warehouse, calibrated SLA-risk prediction, reproducible reporting, and an interactive operations console.
+CivicFlow Analytics is an original, production-style portfolio project for measuring how municipal service teams manage resident requests. It combines realistic synthetic cases, explicit domain rules, immutable lifecycle history, a relational operations warehouse, calibrated SLA-risk prediction, transparent staffing scenarios, reproducible reporting, and an interactive operations console.
 
 ![Architecture](docs/architecture.svg)
 
 ![Synthetic district service map](docs/district-service-map.svg)
 
 ![SLA risk model lifecycle](docs/sla-risk-model.svg)
+
+![Executive staffing scenario planner](docs/staffing-scenario-planner.svg)
 
 ## Why this project exists
 
@@ -30,6 +32,8 @@ No real resident information is used. All records are synthetic and generated lo
 - Small-cohort suppression, 95% Wilson intervals, and uncertainty-aware benchmark flags
 - Leakage-safe SLA-breach prediction with chronological train, calibration, and test windows
 - Calibrated probabilities, interpretable feature effects, top-decile recall, and drift monitoring
+- Configurable staffing scenarios with demand, service-level, effort, shrinkage, and cost assumptions
+- Department capacity gaps, expected utilization, and executive baseline/surge/assurance comparisons
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
 - Interactive dashboard with operational KPIs, cohort trends, and a filter-aware risk queue
 - Stable CSV case output and JSON metric output
@@ -58,6 +62,7 @@ Generated artifacts:
 - `data/generated/sla_prediction_report.json`: holdout discrimination, calibration, drift, and driver metrics
 - `data/generated/open_case_risk_scores.csv`: ranked, calibrated open-case risk queue
 - `data/generated/sla_risk_model.joblib`: fitted preprocessing, classifier, and calibration pipeline
+- `data/generated/staffing_scenario_report.json`: reconciled baseline, surge, and high-assurance staffing plans
 - `data/generated/civicflow.db`: relational case and lifecycle-event warehouse
 
 ## Interactive dashboard
@@ -69,7 +74,7 @@ streamlit run src/civicflow/dashboard.py
 
 Open `http://localhost:8501`. If the warehouse does not exist, the dashboard creates a deterministic 5,000-case demonstration dataset. Set `CIVICFLOW_DB=/path/to/civicflow.db` to use a mounted warehouse.
 
-The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons. The risk view ranks matching open cases by calibrated breach probability and displays holdout quality, calibration error, distribution drift, and interpretable model drivers.
+The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons. The risk view ranks matching open cases by calibrated breach probability and displays holdout quality, calibration error, distribution drift, and interpretable model drivers. Executive controls let leaders vary demand, service targets, and non-casework time, then compare current and required FTE by department.
 
 ## Docker
 
@@ -115,11 +120,19 @@ Closed cases are ordered by intake time, then divided into 60% training, 20% pro
 
 Predictions are decision support for workload planning, not automatic case priority or assignment. Feature coefficients describe modeled associations in synthetic data and do not establish causation. A production deployment should retrain on approved historical data, review calibration by service segment, monitor drift on every scoring period, and require human review of operational policy changes.
 
+## Staffing scenario methodology
+
+Staffing forecasts use the latest 12 complete weeks of intake volume. For each department, the planner calculates mean weekly arrivals and arrival volatility, then applies the selected demand multiplier. The service-level target is converted to a normal-distribution quantile that adds a transparent workload buffer: a higher target can only maintain or increase planned demand.
+
+Direct-work hours come from documented synthetic service-type assumptions, not elapsed case-resolution time. Elapsed time includes queues, routing, travel, and resident-response delays and would overstate labor demand. Required FTE equals buffered weekly work divided by scheduled weekly hours after the selected non-casework allowance. Annual cost deltas use a configurable loaded-cost assumption.
+
+This is a planning model, not an automated hiring recommendation. Before real use, an agency should replace every effort, staffing, shrinkage, and cost assumption with approved workforce data; compare forecasts with schedule coverage and skill constraints; and require finance, labor, and service leadership review.
+
 ## Roadmap
 
-- Add scenario-based staffing forecasts and executive service-level targets
 - Add API ingestion, observability, load tests, and deployment guidance
 - Add downloadable filtered extracts and a polished executive briefing image
+- Add forecast backtesting and department-specific staffing assumption files
 
 ## Responsible use
 

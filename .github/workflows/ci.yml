@@ -53,6 +53,14 @@ jobs:
           assert scores['risk_probability'].is_monotonic_decreasing
           assert Path('/tmp/civicflow/sla_risk_model.joblib').stat().st_size > 0
           assert hasattr(joblib.load('/tmp/civicflow/sla_risk_model.joblib'), 'predict_proba')
+          with open('/tmp/civicflow/staffing_scenario_report.json') as handle:
+              staffing = json.load(handle)
+          assert len(staffing['reports']) == 3
+          for scenario in staffing['reports']:
+              assert scenario['required_fte'] == sum(
+                  row['required_fte'] for row in scenario['forecasts']
+              )
+              assert scenario['fte_gap'] == scenario['required_fte'] - scenario['current_fte']
           PY
       - name: Dashboard analytics smoke test
         run: |
