@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![CI](https://github.com/Siri20052003/CivicFlow-Analytics/actions/workflows/ci.yml/badge.svg)
 
-CivicFlow Analytics is an original, production-style portfolio project for measuring how municipal service teams manage resident requests. It combines realistic synthetic cases, explicit domain rules, immutable lifecycle history, a relational operations warehouse, calibrated SLA-risk prediction, transparent staffing scenarios, reproducible reporting, and an interactive operations console.
+CivicFlow Analytics is an original, production-style portfolio project for measuring how municipal service teams manage resident requests. It combines realistic synthetic cases, explicit domain rules, immutable lifecycle history, a relational operations warehouse, a validated ingestion API, calibrated SLA-risk prediction, transparent staffing scenarios, reproducible reporting, and an interactive operations console.
 
 ![Architecture](docs/architecture.svg)
 
@@ -12,6 +12,8 @@ CivicFlow Analytics is an original, production-style portfolio project for measu
 ![SLA risk model lifecycle](docs/sla-risk-model.svg)
 
 ![Executive staffing scenario planner](docs/staffing-scenario-planner.svg)
+
+![API ingestion runtime](docs/api-ingestion-runtime.svg)
 
 ## Why this project exists
 
@@ -35,6 +37,8 @@ No real resident information is used. All records are synthetic and generated lo
 - Configurable staffing scenarios with demand, service-level, effort, shrinkage, and cost assumptions
 - Department capacity gaps, expected utilization, and executive baseline/surge/assurance comparisons
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
+- Atomic batch-ingestion API with bounded contracts, durable idempotency keys, and conflict detection
+- Liveness/readiness probes, correlation IDs, Prometheus metrics, and a concurrent load probe
 - Interactive dashboard with operational KPIs, cohort trends, and a filter-aware risk queue
 - Stable CSV case output and JSON metric output
 - Installable CLI, non-root Docker runtime, CI quality gates, and automated tests
@@ -76,6 +80,25 @@ Open `http://localhost:8501`. If the warehouse does not exist, the dashboard cre
 
 The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons. The risk view ranks matching open cases by calibrated breach probability and displays holdout quality, calibration error, distribution drift, and interpretable model drivers. Executive controls let leaders vary demand, service targets, and non-casework time, then compare current and required FTE by department.
 
+## Ingestion API
+
+Start the service against a dedicated warehouse:
+
+```bash
+CIVICFLOW_DB=data/generated/civicflow.db civicflow-api
+curl http://localhost:8000/health/ready
+```
+
+`POST /v1/case-batches` accepts one to 1,000 case snapshots and their complete lifecycle histories. Each request supplies a durable `request_id`. Repeating the identical request returns `200` without duplicating rows; reusing the key for changed content, or sending already-stored entity IDs under a new key, returns `409`. Domain-invalid histories return `422` before any rows are committed.
+
+The service exposes bounded reads at `GET /v1/cases`, OpenAPI documentation at `/docs`, and Prometheus text metrics at `/metrics`. Every response carries an `x-request-id`; a valid incoming value is preserved for cross-service tracing. See [deployment guidance](docs/deployment.md) for persistence, gateway, monitoring, and scaling boundaries.
+
+Run the repeatable live probe after starting the API:
+
+```bash
+python scripts/load_probe.py --requests 250 --concurrency 16
+```
+
 ## Docker
 
 ```bash
@@ -84,6 +107,10 @@ docker run --rm -v "$PWD/data/generated:/home/civicflow/output" civicflow-analyt
 
 docker build -f Dockerfile.dashboard -t civicflow-dashboard .
 docker run --rm -p 8501:8501 civicflow-dashboard
+
+docker build -f Dockerfile.api -t civicflow-api .
+docker run --rm -p 8000:8000 \
+  -v "$PWD/data/generated:/home/civicflow/data" civicflow-api
 ```
 
 The container runs as an unprivileged user and writes only to the mounted output directory.
@@ -130,9 +157,9 @@ This is a planning model, not an automated hiring recommendation. Before real us
 
 ## Roadmap
 
-- Add API ingestion, observability, load tests, and deployment guidance
 - Add downloadable filtered extracts and a polished executive briefing image
 - Add forecast backtesting and department-specific staffing assumption files
+- Add gateway-backed authentication and a PostgreSQL adapter for multi-replica deployment
 
 ## Responsible use
 

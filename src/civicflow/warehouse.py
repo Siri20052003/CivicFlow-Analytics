@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 
 from civicflow.model import CaseStatusEvent, ServiceCase
@@ -31,6 +35,13 @@ CREATE TABLE IF NOT EXISTS fact_case_status_event (
     to_status TEXT NOT NULL,
     assigned_team TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ingestion_receipt (
+    request_id TEXT PRIMARY KEY,
+    payload_sha256 TEXT NOT NULL,
+    accepted_cases INTEGER NOT NULL CHECK (accepted_cases >= 0),
+    accepted_events INTEGER NOT NULL CHECK (accepted_events >= 0),
+    ingested_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_event_case_time
     ON fact_case_status_event(case_id, occurred_at);
 CREATE INDEX IF NOT EXISTS idx_case_department_open
@@ -46,6 +57,112 @@ JOIN fact_case_status_event AS e ON e.event_id = (
 """
 
 
+class IngestionConflict(ValueError):
+    """Raised when an idempotency key or entity ID conflicts with stored data."""
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionResult:
+    request_id: str
+    accepted_cases: int
+    accepted_events: int
+    replayed: bool
+
+
+def initialize_warehouse(database: Path) -> None:
+    """Create the warehouse schema without replacing any existing records."""
+    database.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(database) as connection:
+        connection.executescript(SCHEMA)
+
+
+def _payload_fingerprint(cases: list[ServiceCase], events: list[CaseStatusEvent]) -> str:
+    payload = {
+        "cases": [case.to_record() for case in cases],
+        "events": [event.to_record() for event in events],
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return sha256(encoded).hexdigest()
+
+
+def ingest_case_batch(
+    database: Path,
+    request_id: str,
+    cases: list[ServiceCase],
+    events: list[CaseStatusEvent],
+) -> IngestionResult:
+    """Atomically append one validated batch with durable idempotency semantics."""
+    validate_cases(cases)
+    validate_status_events(cases, events)
+    initialize_warehouse(database)
+    fingerprint = _payload_fingerprint(cases, events)
+    try:
+        with sqlite3.connect(database, timeout=15) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            receipt = connection.execute(
+                """SELECT payload_sha256, accepted_cases, accepted_events
+                FROM ingestion_receipt WHERE request_id = ?""",
+                (request_id,),
+            ).fetchone()
+            if receipt:
+                if receipt[0] != fingerprint:
+                    raise IngestionConflict(
+                        f"request_id {request_id!r} was already used for a different payload"
+                    )
+                connection.rollback()
+                return IngestionResult(request_id, receipt[1], receipt[2], replayed=True)
+
+            connection.executemany(
+                """INSERT INTO dim_case VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                [_case_row(case) for case in cases],
+            )
+            connection.executemany(
+                """INSERT INTO fact_case_status_event VALUES (?, ?, ?, ?, ?, ?)""",
+                [_event_row(event) for event in events],
+            )
+            connection.execute(
+                """INSERT INTO ingestion_receipt VALUES (?, ?, ?, ?, ?)""",
+                (
+                    request_id,
+                    fingerprint,
+                    len(cases),
+                    len(events),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            connection.commit()
+    except sqlite3.IntegrityError as error:
+        raise IngestionConflict(f"batch conflicts with stored entity IDs: {error}") from error
+    return IngestionResult(request_id, len(cases), len(events), replayed=False)
+
+
+def _case_row(case: ServiceCase) -> tuple[object, ...]:
+    return (
+        case.case_id,
+        case.opened_at.isoformat(),
+        str(case.department),
+        case.service_type,
+        str(case.priority),
+        case.channel,
+        case.district,
+        case.assigned_team,
+        case.target_hours,
+        case.closed_at.isoformat() if case.closed_at else None,
+        case.satisfaction_score,
+    )
+
+
+def _event_row(event: CaseStatusEvent) -> tuple[object, ...]:
+    return (
+        event.event_id,
+        event.case_id,
+        event.occurred_at.isoformat(),
+        str(event.from_status) if event.from_status else None,
+        str(event.to_status),
+        event.assigned_team,
+    )
+
+
 def load_warehouse(database: Path, cases: list[ServiceCase], events: list[CaseStatusEvent]) -> None:
     """Atomically replace a generated dataset after validating both contracts."""
     validate_cases(cases)
@@ -54,38 +171,14 @@ def load_warehouse(database: Path, cases: list[ServiceCase], events: list[CaseSt
     with sqlite3.connect(database) as connection:
         connection.executescript(SCHEMA)
         with connection:
+            connection.execute("DELETE FROM ingestion_receipt")
             connection.execute("DELETE FROM fact_case_status_event")
             connection.execute("DELETE FROM dim_case")
             connection.executemany(
                 """INSERT INTO dim_case VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                [
-                    (
-                        case.case_id,
-                        case.opened_at.isoformat(),
-                        str(case.department),
-                        case.service_type,
-                        str(case.priority),
-                        case.channel,
-                        case.district,
-                        case.assigned_team,
-                        case.target_hours,
-                        case.closed_at.isoformat() if case.closed_at else None,
-                        case.satisfaction_score,
-                    )
-                    for case in cases
-                ],
+                [_case_row(case) for case in cases],
             )
             connection.executemany(
                 """INSERT INTO fact_case_status_event VALUES (?, ?, ?, ?, ?, ?)""",
-                [
-                    (
-                        event.event_id,
-                        event.case_id,
-                        event.occurred_at.isoformat(),
-                        str(event.from_status) if event.from_status else None,
-                        str(event.to_status),
-                        event.assigned_team,
-                    )
-                    for event in events
-                ],
+                [_event_row(event) for event in events],
             )

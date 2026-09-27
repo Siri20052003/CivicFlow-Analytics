@@ -81,4 +81,24 @@ jobs:
           else:
               raise RuntimeError('dashboard failed health check')
           PY
+      - name: API ingestion and concurrent load probe
+        run: |
+          CIVICFLOW_DB=/tmp/civicflow-api.db civicflow-api &
+          api_pid=$!
+          trap 'kill $api_pid' EXIT
+          python - <<'PY'
+          import time
+          import urllib.request
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8000/health/ready') as response:
+                      assert response.status == 200
+                      break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise RuntimeError('API failed readiness check')
+          PY
+          python scripts/load_probe.py --requests 250 --concurrency 16 --max-p95-ms 2000
       - run: docker build -f Dockerfile.dashboard -t civicflow-dashboard .
+      - run: docker build -f Dockerfile.api -t civicflow-api .
