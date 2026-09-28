@@ -17,6 +17,11 @@ from civicflow.prediction import (
     score_open_cases_frame,
     train_sla_risk_model_frame,
 )
+from civicflow.reporting import (
+    build_executive_brief,
+    build_operational_export_bundle,
+    render_executive_briefing_html,
+)
 from civicflow.staffing import (
     StaffingScenario,
     StaffingScenarioReport,
@@ -204,23 +209,67 @@ def render() -> None:
     cycle, cohorts, district_metrics, kpis = build_dashboard_metrics(
         filtered_cases, filtered_events, as_of=as_of
     )
-    columns = st.columns(4)
-    columns[0].metric("Cases", f"{kpis['total_cases']:,}")
-    columns[1].metric("Open backlog", f"{kpis['open_cases']:,}")
-    columns[2].metric("Current SLA breaches", f"{kpis['current_breaches']:,}")
-    columns[3].metric("Closed-case compliance", f"{kpis['compliance_rate']:.1%}")
-
-    st.subheader("Executive staffing scenario")
-    st.caption(
-        "Citywide department demand using complete historical weeks, explicit task-effort "
-        "assumptions, and a configurable arrival buffer."
-    )
     staffing, staffing_table = build_staffing_view(
         cases,
         departments=departments,
         demand_multiplier=demand_multiplier,
         service_level_target=service_level_target,
         shrinkage_rate=shrinkage_rate,
+    )
+    prediction, risk_scores, feature_effects = build_risk_view(cases, filtered_cases)
+    brief = build_executive_brief(
+        kpis,
+        staffing,
+        risk_scores,
+        prediction,
+        departments=departments,
+        districts=districts,
+        generated_at=as_of,
+    )
+    briefing_html = render_executive_briefing_html(brief, staffing)
+    export_bundle = build_operational_export_bundle(
+        filtered_cases, filtered_events, brief, briefing_html
+    )
+    columns = st.columns(4)
+    columns[0].metric("Cases", f"{kpis['total_cases']:,}")
+    columns[1].metric("Open backlog", f"{kpis['open_cases']:,}")
+    columns[2].metric("Current SLA breaches", f"{kpis['current_breaches']:,}")
+    columns[3].metric("Closed-case compliance", f"{kpis['compliance_rate']:.1%}")
+
+    st.subheader("Executive briefing")
+    with st.container(border=True):
+        brief_columns = st.columns(4)
+        brief_columns[0].metric("Modeled FTE gap", f"{brief.fte_gap:+d}")
+        brief_columns[1].metric("Annual capacity delta", f"${brief.annualized_cost_delta:,.0f}")
+        brief_columns[2].metric("High-risk queue", brief.high_risk_queue_cases)
+        brief_columns[3].metric("Model drift", brief.risk_drift.replace("_", " ").title())
+        st.markdown("**Leadership actions**")
+        for action in brief.priority_actions:
+            st.markdown(f"- {action}")
+        download_columns = st.columns(2)
+        download_columns[0].download_button(
+            "Download executive briefing",
+            briefing_html,
+            file_name=f"civicflow-executive-briefing-{as_of.date().isoformat()}.html",
+            mime="text/html",
+            width="stretch",
+        )
+        download_columns[1].download_button(
+            "Download governed extract bundle",
+            export_bundle,
+            file_name=f"civicflow-operational-extract-{as_of.date().isoformat()}.zip",
+            mime="application/zip",
+            width="stretch",
+        )
+    st.caption(
+        "Downloads preserve the active department and district filters. The bundle includes "
+        "case and event grains, checksums, a scope manifest, and interpretation notes."
+    )
+
+    st.subheader("Executive staffing scenario")
+    st.caption(
+        "Citywide department demand using complete historical weeks, explicit task-effort "
+        "assumptions, and a configurable arrival buffer."
     )
     staffing_columns = st.columns(4)
     staffing_columns[0].metric("Current FTE", staffing.current_fte)
@@ -251,7 +300,6 @@ def render() -> None:
         "Calibrated intake-time probabilities support workload planning; they do not "
         "automatically change case priority or assignment."
     )
-    prediction, risk_scores, feature_effects = build_risk_view(cases, filtered_cases)
     risk_columns = st.columns(4)
     risk_columns[0].metric("Holdout ROC AUC", f"{prediction.roc_auc:.3f}")
     risk_columns[1].metric("Brier score", f"{prediction.brier_score:.3f}")

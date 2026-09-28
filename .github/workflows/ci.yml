@@ -62,6 +62,17 @@ jobs:
               )
               assert scenario['fte_gap'] == scenario['required_fte'] - scenario['current_fte']
           PY
+      - name: Validate portfolio visuals
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          visuals = list(Path('docs').glob('*.svg'))
+          assert len(visuals) >= 6
+          for visual in visuals:
+              ET.parse(visual)
+          print(f'validated {len(visuals)} SVG assets')
+          PY
       - name: Dashboard analytics smoke test
         run: |
           CIVICFLOW_DB=/tmp/civicflow/civicflow.db streamlit run src/civicflow/dashboard.py \

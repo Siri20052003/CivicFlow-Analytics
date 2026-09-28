@@ -15,6 +15,8 @@ CivicFlow Analytics is an original, production-style portfolio project for measu
 
 ![API ingestion runtime](docs/api-ingestion-runtime.svg)
 
+![Executive briefing and governed exports](docs/executive-briefing-preview.svg)
+
 ## Why this project exists
 
 Public-service dashboards are only credible when their operational definitions are clear. CivicFlow treats each metric as the output of a validated case ledger instead of starting with visualizations. The generator preserves realistic relationships between priority, SLA target, department, team, closure state, and satisfaction.
@@ -39,6 +41,8 @@ No real resident information is used. All records are synthetic and generated lo
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
 - Atomic batch-ingestion API with bounded contracts, durable idempotency keys, and conflict detection
 - Liveness/readiness probes, correlation IDs, Prometheus metrics, and a concurrent load probe
+- Filter-aware case and lifecycle extracts with SHA-256 checksums and a governance manifest
+- Self-contained, print-ready executive briefings with reconciled KPIs and leadership actions
 - Interactive dashboard with operational KPIs, cohort trends, and a filter-aware risk queue
 - Stable CSV case output and JSON metric output
 - Installable CLI, non-root Docker runtime, CI quality gates, and automated tests
@@ -79,6 +83,8 @@ streamlit run src/civicflow/dashboard.py
 Open `http://localhost:8501`. If the warehouse does not exist, the dashboard creates a deterministic 5,000-case demonstration dataset. Set `CIVICFLOW_DB=/path/to/civicflow.db` to use a mounted warehouse.
 
 The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons. The risk view ranks matching open cases by calibrated breach probability and displays holdout quality, calibration error, distribution drift, and interpretable model drivers. Executive controls let leaders vary demand, service targets, and non-casework time, then compare current and required FTE by department.
+
+The executive briefing section turns the active filter state into prioritized operating actions and two portable downloads. The HTML briefing is self-contained and print-ready. The ZIP bundle includes the filtered current-case grain, matching immutable status events, the briefing, interpretation notes, and a JSON manifest containing filter scope, row counts, byte sizes, and SHA-256 checksums. Spreadsheet formula prefixes are neutralized in CSV text fields. These controls keep exported evidence traceable to the dashboard selection that produced it.
 
 ## Ingestion API
 
@@ -157,9 +163,9 @@ This is a planning model, not an automated hiring recommendation. Before real us
 
 ## Roadmap
 
-- Add downloadable filtered extracts and a polished executive briefing image
 - Add forecast backtesting and department-specific staffing assumption files
 - Add gateway-backed authentication and a PostgreSQL adapter for multi-replica deployment
+- Add scheduled briefing snapshots with approved retention controls
 
 ## Responsible use
 
