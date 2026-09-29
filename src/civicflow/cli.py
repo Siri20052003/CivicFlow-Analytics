@@ -12,7 +12,12 @@ from civicflow.analytics import build_backlog_report, build_sla_report
 from civicflow.geography import build_district_service_report
 from civicflow.io import write_cases_csv, write_dataclass_json, write_report_json
 from civicflow.prediction import cases_to_frame, score_open_cases_frame, train_sla_risk_model
-from civicflow.staffing import build_default_staffing_suite
+from civicflow.staffing import (
+    StaffingScenario,
+    build_default_staffing_suite,
+    build_staffing_backtest_frame,
+    load_department_assumptions,
+)
 from civicflow.synthetic import generate_cases, generate_status_events
 from civicflow.validation import validate_cases, validate_status_events
 from civicflow.warehouse import load_warehouse
@@ -24,6 +29,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cases", type=int, default=5_000)
     parser.add_argument("--seed", type=int, default=20260922)
     parser.add_argument("--output-dir", type=Path, default=Path("data/generated"))
+    parser.add_argument(
+        "--staffing-assumptions",
+        type=Path,
+        default=Path(__file__).with_name("staffing_assumptions.json"),
+    )
     return parser
 
 
@@ -42,7 +52,13 @@ def main() -> None:
     risk_model, prediction_report = train_sla_risk_model(cases)
     case_frame = cases_to_frame(cases)
     open_risk_scores = score_open_cases_frame(case_frame, risk_model)
-    staffing_suite = build_default_staffing_suite(case_frame)
+    department_assumptions = load_department_assumptions(args.staffing_assumptions)
+    staffing_suite = build_default_staffing_suite(
+        case_frame, department_assumptions=department_assumptions
+    )
+    staffing_backtest = build_staffing_backtest_frame(
+        case_frame, StaffingScenario(name="Historical accuracy", history_weeks=8)
+    )
     write_cases_csv(cases, args.output_dir / "service_cases.csv")
     write_report_json(report, args.output_dir / "sla_report.json")
     write_report_json(backlog, args.output_dir / "backlog_report.json")
@@ -51,6 +67,7 @@ def main() -> None:
     write_report_json(districts, args.output_dir / "district_service_report.json")
     write_dataclass_json(prediction_report, args.output_dir / "sla_prediction_report.json")
     write_dataclass_json(staffing_suite, args.output_dir / "staffing_scenario_report.json")
+    write_dataclass_json(staffing_backtest, args.output_dir / "staffing_backtest_report.json")
     open_risk_scores.to_csv(args.output_dir / "open_case_risk_scores.csv", index=False)
     joblib.dump(risk_model, args.output_dir / "sla_risk_model.joblib")
     load_warehouse(args.output_dir / "civicflow.db", cases, events)

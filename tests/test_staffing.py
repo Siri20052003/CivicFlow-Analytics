@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -8,9 +9,12 @@ import pytest
 from civicflow.prediction import cases_to_frame
 from civicflow.staffing import (
     DEFAULT_CURRENT_FTE,
+    DepartmentStaffingAssumption,
     StaffingScenario,
     build_default_staffing_suite,
+    build_staffing_backtest_frame,
     build_staffing_scenario_frame,
+    load_department_assumptions,
 )
 from civicflow.synthetic import generate_cases
 
@@ -83,3 +87,65 @@ def test_unknown_service_requires_an_explicit_effort_assumption(case_frame) -> N
     changed.loc[changed.index[0], "service_type"] = "unmapped_request"
     with pytest.raises(ValueError, match="missing effort assumptions"):
         build_staffing_scenario_frame(changed, StaffingScenario(name="Plan"))
+
+
+def test_rolling_backtest_reports_reconciled_department_accuracy(case_frame) -> None:
+    report = build_staffing_backtest_frame(
+        case_frame, StaffingScenario(name="Backtest", history_weeks=8), validation_weeks=4
+    )
+
+    assert report.validation_weeks == 4
+    assert report.validation_start < report.validation_end
+    assert len(report.departments) == 5
+    assert all(item.validation_weeks == 4 for item in report.departments)
+    assert report.mean_absolute_error >= 0
+    assert report.weighted_absolute_percentage_error >= 0
+    assert 0 <= report.planning_coverage_rate <= 1
+
+
+def test_backtest_rejects_short_validation_and_history(case_frame) -> None:
+    with pytest.raises(ValueError, match="at least 4"):
+        build_staffing_backtest_frame(
+            case_frame, StaffingScenario(name="Backtest"), validation_weeks=3
+        )
+    recent = case_frame.sort_values("opened_at").tail(100)
+    with pytest.raises(ValueError, match="complete weeks"):
+        build_staffing_backtest_frame(
+            recent, StaffingScenario(name="Backtest", history_weeks=8), validation_weeks=4
+        )
+
+
+def test_department_assumption_file_changes_capacity_and_cost(case_frame, tmp_path) -> None:
+    source = Path("src/civicflow/staffing_assumptions.json")
+    assumptions = load_department_assumptions(source)
+    report = build_staffing_scenario_frame(
+        case_frame,
+        StaffingScenario(name="Configured"),
+        department_assumptions=assumptions,
+    )
+
+    assert report.current_fte == sum(item.current_fte for item in assumptions.values())
+    assert report.annualized_cost_delta == sum(
+        item.annualized_cost_delta for item in report.forecasts
+    )
+    water = next(item for item in report.forecasts if item.department == "Water Utilities")
+    assert water.annualized_cost_delta == water.fte_gap * 102_000
+
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text('{"Public Works": {"current_fte": 0}}', encoding="utf-8")
+    with pytest.raises(ValueError, match="contain exactly"):
+        load_department_assumptions(invalid)
+
+
+def test_current_fte_and_department_assumptions_are_mutually_exclusive(case_frame) -> None:
+    assumptions = {
+        department: DepartmentStaffingAssumption(1, 40, 0.2, 90_000)
+        for department in DEFAULT_CURRENT_FTE
+    }
+    with pytest.raises(ValueError, match="not both"):
+        build_staffing_scenario_frame(
+            case_frame,
+            StaffingScenario(name="Invalid"),
+            current_fte=DEFAULT_CURRENT_FTE,
+            department_assumptions=assumptions,
+        )

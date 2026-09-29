@@ -37,6 +37,8 @@ No real resident information is used. All records are synthetic and generated lo
 - Leakage-safe SLA-breach prediction with chronological train, calibration, and test windows
 - Calibrated probabilities, interpretable feature effects, top-decile recall, and drift monitoring
 - Configurable staffing scenarios with demand, service-level, effort, shrinkage, and cost assumptions
+- Department-specific staffing assumptions stored in a validated, reviewable configuration file
+- Leakage-safe rolling forecast backtests with MAE, WAPE, bias, and planning coverage
 - Department capacity gaps, expected utilization, and executive baseline/surge/assurance comparisons
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
 - Atomic batch-ingestion API with bounded contracts, durable idempotency keys, and conflict detection
@@ -59,6 +61,8 @@ pytest
 civicflow --cases 5000 --seed 20260922 --output-dir data/generated
 ```
 
+Pass `--staffing-assumptions path/to/assumptions.json` to evaluate a reviewed alternative configuration without changing application code.
+
 Generated artifacts:
 
 - `data/generated/service_cases.csv`: row-level synthetic case ledger
@@ -71,6 +75,7 @@ Generated artifacts:
 - `data/generated/open_case_risk_scores.csv`: ranked, calibrated open-case risk queue
 - `data/generated/sla_risk_model.joblib`: fitted preprocessing, classifier, and calibration pipeline
 - `data/generated/staffing_scenario_report.json`: reconciled baseline, surge, and high-assurance staffing plans
+- `data/generated/staffing_backtest_report.json`: rolling department and citywide forecast accuracy
 - `data/generated/civicflow.db`: relational case and lifecycle-event warehouse
 
 ## Interactive dashboard
@@ -82,7 +87,7 @@ streamlit run src/civicflow/dashboard.py
 
 Open `http://localhost:8501`. If the warehouse does not exist, the dashboard creates a deterministic 5,000-case demonstration dataset. Set `CIVICFLOW_DB=/path/to/civicflow.db` to use a mounted warehouse.
 
-The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons. The risk view ranks matching open cases by calibrated breach probability and displays holdout quality, calibration error, distribution drift, and interpretable model drivers. Executive controls let leaders vary demand, service targets, and non-casework time, then compare current and required FTE by department.
+The console supports multi-select department and district filters. Its KPI cards distinguish closed-case compliance from current open-case breaches; workflow charts show response and active-work time; monthly cohorts make trend changes visible without mixing intake periods. A synthetic district map sizes markers by case volume and pairs them with uncertainty-aware service comparisons. The risk view ranks matching open cases by calibrated breach probability and displays holdout quality, calibration error, distribution drift, and interpretable model drivers. Executive controls let leaders vary demand, service targets, and non-casework time, then compare current and required FTE by department. The staffing governance panel reports recent one-week-ahead forecast accuracy by department so leaders can see error, direction of bias, and how often the buffered plan covered observed arrivals.
 
 The executive briefing section turns the active filter state into prioritized operating actions and two portable downloads. The HTML briefing is self-contained and print-ready. The ZIP bundle includes the filtered current-case grain, matching immutable status events, the briefing, interpretation notes, and a JSON manifest containing filter scope, row counts, byte sizes, and SHA-256 checksums. Spreadsheet formula prefixes are neutralized in CSV text fields. These controls keep exported evidence traceable to the dashboard selection that produced it.
 
@@ -159,12 +164,16 @@ Staffing forecasts use the latest 12 complete weeks of intake volume. For each d
 
 Direct-work hours come from documented synthetic service-type assumptions, not elapsed case-resolution time. Elapsed time includes queues, routing, travel, and resident-response delays and would overstate labor demand. Required FTE equals buffered weekly work divided by scheduled weekly hours after the selected non-casework allowance. Annual cost deltas use a configurable loaded-cost assumption.
 
+The CLI loads the packaged `src/civicflow/staffing_assumptions.json`, where every department declares current FTE, scheduled hours, non-casework time, loaded annual cost, and an effort multiplier. The loader rejects missing, extra, or out-of-range fields before planning begins. This keeps workforce assumptions reviewable and versioned rather than embedded in dashboard code.
+
+Forecast accuracy uses four rolling one-week-ahead evaluations. Each origin trains only on the preceding eight complete weeks, so no future intake enters an earlier forecast. Mean absolute error reports the typical weekly miss in cases; weighted absolute percentage error scales total error by actual demand; signed bias reveals systematic over- or under-forecasting; and planning coverage reports how often the service-level buffer met or exceeded observed arrivals. These synthetic results demonstrate governance mechanics, not expected production accuracy.
+
 This is a planning model, not an automated hiring recommendation. Before real use, an agency should replace every effort, staffing, shrinkage, and cost assumption with approved workforce data; compare forecasts with schedule coverage and skill constraints; and require finance, labor, and service leadership review.
 
 ## Roadmap
 
-- Add forecast backtesting and department-specific staffing assumption files
 - Add gateway-backed authentication and a PostgreSQL adapter for multi-replica deployment
+- Add forecast monitoring thresholds and approved assumption-change audit history
 - Add scheduled briefing snapshots with approved retention controls
 
 ## Responsible use

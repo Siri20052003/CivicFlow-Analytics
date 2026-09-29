@@ -23,8 +23,10 @@ from civicflow.reporting import (
     render_executive_briefing_html,
 )
 from civicflow.staffing import (
+    StaffingBacktestReport,
     StaffingScenario,
     StaffingScenarioReport,
+    build_staffing_backtest_frame,
     build_staffing_scenario_frame,
 )
 from civicflow.synthetic import generate_cases, generate_status_events
@@ -174,6 +176,18 @@ def build_staffing_view(
     return report, pd.DataFrame([asdict(item) for item in report.forecasts])
 
 
+def build_staffing_accuracy_view(
+    cases: pd.DataFrame, *, departments: list[str]
+) -> tuple[StaffingBacktestReport, pd.DataFrame]:
+    """Backtest recent one-week-ahead forecasts for the selected departments."""
+    planning_cases = cases[cases["department"].isin(departments)].copy()
+    report = build_staffing_backtest_frame(
+        planning_cases,
+        StaffingScenario(name="Historical accuracy", service_level_target=0.90, history_weeks=8),
+    )
+    return report, pd.DataFrame([asdict(item) for item in report.departments])
+
+
 def render() -> None:
     st.set_page_config(page_title="CivicFlow Operations", page_icon="🏙️", layout="wide")
     st.title("CivicFlow Operations Console")
@@ -215,6 +229,9 @@ def render() -> None:
         demand_multiplier=demand_multiplier,
         service_level_target=service_level_target,
         shrinkage_rate=shrinkage_rate,
+    )
+    staffing_accuracy, staffing_accuracy_table = build_staffing_accuracy_view(
+        cases, departments=departments
     )
     prediction, risk_scores, feature_effects = build_risk_view(cases, filtered_cases)
     brief = build_executive_brief(
@@ -284,6 +301,8 @@ def render() -> None:
                 "expected_weekly_cases",
                 "planning_weekly_cases",
                 "average_effort_hours",
+                "scheduled_hours_per_fte_week",
+                "shrinkage_rate",
                 "expected_utilization",
                 "current_fte",
                 "required_fte",
@@ -294,6 +313,23 @@ def render() -> None:
         width="stretch",
         hide_index=True,
     )
+    with st.expander("Forecast accuracy and governance", expanded=True):
+        st.caption(
+            "Rolling one-week-ahead validation uses only the preceding eight complete weeks. "
+            "Coverage measures how often the buffered plan met or exceeded observed arrivals."
+        )
+        accuracy_columns = st.columns(4)
+        accuracy_columns[0].metric("Validation weeks", staffing_accuracy.validation_weeks)
+        accuracy_columns[1].metric(
+            "Forecast MAE", f"{staffing_accuracy.mean_absolute_error:.1f} cases"
+        )
+        accuracy_columns[2].metric(
+            "WAPE", f"{staffing_accuracy.weighted_absolute_percentage_error:.1%}"
+        )
+        accuracy_columns[3].metric(
+            "Planning coverage", f"{staffing_accuracy.planning_coverage_rate:.1%}"
+        )
+        st.dataframe(staffing_accuracy_table, width="stretch", hide_index=True)
 
     st.subheader("SLA breach risk")
     st.caption(
