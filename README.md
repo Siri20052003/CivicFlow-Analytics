@@ -42,6 +42,7 @@ No real resident information is used. All records are synthetic and generated lo
 - Department capacity gaps, expected utilization, and executive baseline/surge/assurance comparisons
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
 - Atomic batch-ingestion API with bounded contracts, durable idempotency keys, and conflict detection
+- Fail-closed bearer authentication with hashed, expiring credentials and least-privilege route scopes
 - Liveness/readiness probes, correlation IDs, Prometheus metrics, and a concurrent load probe
 - Filter-aware case and lifecycle extracts with SHA-256 checksums and a governance manifest
 - Self-contained, print-ready executive briefings with reconciled KPIs and leadership actions
@@ -96,18 +97,23 @@ The executive briefing section turns the active filter state into prioritized op
 Start the service against a dedicated warehouse:
 
 ```bash
+export CIVICFLOW_API_KEY='replace-with-a-secret-at-least-16-characters-long'
+export TOKEN_DIGEST="$(printf %s "$CIVICFLOW_API_KEY" | sha256sum | cut -d' ' -f1)"
+export CIVICFLOW_API_KEYS="{\"local-admin\":{\"token_sha256\":\"$TOKEN_DIGEST\",\"scopes\":[\"cases:read\",\"cases:write\",\"ops:read\"]}}"
 CIVICFLOW_DB=data/generated/civicflow.db civicflow-api
 curl http://localhost:8000/health/ready
+curl -H "Authorization: Bearer $CIVICFLOW_API_KEY" http://localhost:8000/v1/cases
 ```
 
 `POST /v1/case-batches` accepts one to 1,000 case snapshots and their complete lifecycle histories. Each request supplies a durable `request_id`. Repeating the identical request returns `200` without duplicating rows; reusing the key for changed content, or sending already-stored entity IDs under a new key, returns `409`. Domain-invalid histories return `422` before any rows are committed.
 
-The service exposes bounded reads at `GET /v1/cases`, OpenAPI documentation at `/docs`, and Prometheus text metrics at `/metrics`. Every response carries an `x-request-id`; a valid incoming value is preserved for cross-service tracing. See [deployment guidance](docs/deployment.md) for persistence, gateway, monitoring, and scaling boundaries.
+The service exposes bounded reads at `GET /v1/cases`, OpenAPI documentation at `/docs`, and Prometheus text metrics at `/metrics`. Case reads, writes, and metrics require `cases:read`, `cases:write`, and `ops:read`, respectively. Configuration accepts token digests rather than plaintext secrets, supports expiration and overlap-based rotation, and records only bounded failure reasons in telemetry. Every response carries an `x-request-id`; a valid incoming value is preserved for cross-service tracing. See [deployment guidance](docs/deployment.md) for credential rotation, persistence, gateway, monitoring, and scaling boundaries.
 
 Run the repeatable live probe after starting the API:
 
 ```bash
-python scripts/load_probe.py --requests 250 --concurrency 16
+CIVICFLOW_API_KEY="$CIVICFLOW_API_KEY" python scripts/load_probe.py \
+  --requests 250 --concurrency 16
 ```
 
 ## Docker
@@ -121,6 +127,7 @@ docker run --rm -p 8501:8501 civicflow-dashboard
 
 docker build -f Dockerfile.api -t civicflow-api .
 docker run --rm -p 8000:8000 \
+  -e CIVICFLOW_API_KEYS="$CIVICFLOW_API_KEYS" \
   -v "$PWD/data/generated:/home/civicflow/data" civicflow-api
 ```
 
@@ -172,7 +179,7 @@ This is a planning model, not an automated hiring recommendation. Before real us
 
 ## Roadmap
 
-- Add gateway-backed authentication and a PostgreSQL adapter for multi-replica deployment
+- Add a PostgreSQL storage adapter with migration and multi-replica concurrency tests
 - Add forecast monitoring thresholds and approved assumption-change audit history
 - Add scheduled briefing snapshots with approved retention controls
 

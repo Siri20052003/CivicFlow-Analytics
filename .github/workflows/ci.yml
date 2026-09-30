@@ -103,6 +103,10 @@ jobs:
               raise RuntimeError('dashboard failed health check')
           PY
       - name: API ingestion and concurrent load probe
+        env:
+          CIVICFLOW_API_KEY: civicflow-ci-probe-secret-2026
+          CIVICFLOW_API_KEYS: >-
+            {"ci-probe":{"token_sha256":"e1936fb79bd4a7004c3f2c583594874bf2bb75fc215b2bbc96603a308b6930f8","scopes":["cases:read","cases:write","ops:read"]}}
         run: |
           CIVICFLOW_DB=/tmp/civicflow-api.db civicflow-api &
           api_pid=$!

@@ -13,10 +13,17 @@ from typing import Annotated
 from uuid import uuid4
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, Security
 from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
+from civicflow.auth import (
+    ApiAuthenticator,
+    ApiCredential,
+    ApiPrincipal,
+    load_api_credentials,
+)
 from civicflow.model import CaseStatusEvent, Department, Priority, ServiceCase, Status
 from civicflow.validation import ValidationError
 from civicflow.warehouse import (
@@ -26,6 +33,11 @@ from civicflow.warehouse import (
 )
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
+BEARER_SECURITY = HTTPBearer(
+    auto_error=False,
+    bearerFormat="opaque service token",
+    description="Service credential configured by SHA-256 digest; tokens are never stored.",
+)
 
 
 class CaseInput(BaseModel):
@@ -94,6 +106,7 @@ class ApiMetrics:
         self._accepted_events = 0
         self._replays = 0
         self._conflicts = 0
+        self._auth_failures: defaultdict[str, int] = defaultdict(int)
 
     def observe_request(self, method: str, path: str, status: int, latency: float) -> None:
         with self._lock:
@@ -112,6 +125,10 @@ class ApiMetrics:
         with self._lock:
             self._conflicts += 1
 
+    def observe_auth_failure(self, reason: str) -> None:
+        with self._lock:
+            self._auth_failures[reason] += 1
+
     def render(self) -> str:
         with self._lock:
             request_rows = sorted(self._requests.items())
@@ -120,6 +137,7 @@ class ApiMetrics:
             accepted_events = self._accepted_events
             replays = self._replays
             conflicts = self._conflicts
+            auth_failures = sorted(self._auth_failures.items())
         lines = [
             "# HELP civicflow_http_requests_total HTTP requests processed.",
             "# TYPE civicflow_http_requests_total counter",
@@ -146,8 +164,13 @@ class ApiMetrics:
                 "# HELP civicflow_ingestion_conflicts_total Rejected ingestion conflicts.",
                 "# TYPE civicflow_ingestion_conflicts_total counter",
                 f"civicflow_ingestion_conflicts_total {conflicts}",
+                "# HELP civicflow_auth_failures_total "
+                "Rejected authentication or authorization attempts.",
+                "# TYPE civicflow_auth_failures_total counter",
             ]
         )
+        for reason, count in auth_failures:
+            lines.append(f'civicflow_auth_failures_total{{reason="{reason}"}} {count}')
         return "\n".join(lines) + "\n"
 
 
@@ -168,9 +191,16 @@ def _database_is_ready(database: Path) -> tuple[bool, str]:
     return (False, f"missing tables: {', '.join(missing)}") if missing else (True, "ready")
 
 
-def create_app(database: Path | None = None) -> FastAPI:
+def create_app(
+    database: Path | None = None,
+    credentials: tuple[ApiCredential, ...] | None = None,
+) -> FastAPI:
     """Build an isolated app instance for production or tests."""
     database = database or Path(os.environ.get("CIVICFLOW_DB", "data/generated/civicflow.db"))
+    configured_credentials = credentials or load_api_credentials(
+        os.environ.get("CIVICFLOW_API_KEYS", "")
+    )
+    authenticator = ApiAuthenticator(configured_credentials)
     initialize_warehouse(database)
     metrics = ApiMetrics()
     app = FastAPI(
@@ -180,6 +210,36 @@ def create_app(database: Path | None = None) -> FastAPI:
     )
     app.state.database = database
     app.state.metrics = metrics
+    app.state.authenticator = authenticator
+
+    def require_scope(required_scope: str):  # type: ignore[no-untyped-def]
+        def authorize(
+            bearer: Annotated[HTTPAuthorizationCredentials | None, Security(BEARER_SECURITY)],
+        ) -> ApiPrincipal:
+            if bearer is None:
+                metrics.observe_auth_failure("missing")
+                raise HTTPException(
+                    status_code=401,
+                    detail="bearer credential required",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            principal, reason = authenticator.authenticate(bearer.credentials)
+            if principal is None:
+                metrics.observe_auth_failure(reason or "invalid")
+                raise HTTPException(
+                    status_code=401,
+                    detail="invalid or expired bearer credential",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            if required_scope not in principal.scopes:
+                metrics.observe_auth_failure("insufficient_scope")
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"required scope: {required_scope}",
+                )
+            return principal
+
+        return authorize
 
     @app.middleware("http")
     async def operational_context(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -219,7 +279,12 @@ def create_app(database: Path | None = None) -> FastAPI:
             response.status_code = 503
         return {"status": "ready" if ready else "unavailable", "detail": detail}
 
-    @app.get("/metrics", response_class=PlainTextResponse, tags=["operations"])
+    @app.get(
+        "/metrics",
+        response_class=PlainTextResponse,
+        tags=["operations"],
+        dependencies=[Depends(require_scope("ops:read"))],
+    )
     def prometheus_metrics() -> str:
         return metrics.render()
 
@@ -228,8 +293,12 @@ def create_app(database: Path | None = None) -> FastAPI:
         response_model=IngestionResponse,
         status_code=201,
         tags=["ingestion"],
+        dependencies=[Depends(require_scope("cases:write"))],
     )
-    def ingest(payload: IngestionRequest, response: Response) -> IngestionResponse:
+    def ingest(
+        payload: IngestionRequest,
+        response: Response,
+    ) -> IngestionResponse:
         try:
             result = ingest_case_batch(
                 database,
@@ -250,7 +319,11 @@ def create_app(database: Path | None = None) -> FastAPI:
             replayed=result.replayed,
         )
 
-    @app.get("/v1/cases", tags=["query"])
+    @app.get(
+        "/v1/cases",
+        tags=["query"],
+        dependencies=[Depends(require_scope("cases:read"))],
+    )
     def list_cases(
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,

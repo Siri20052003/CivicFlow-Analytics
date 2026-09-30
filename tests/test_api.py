@@ -1,10 +1,19 @@
 import sqlite3
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from civicflow.api import create_app
+from civicflow.auth import ApiCredential
+
+WRITE_TOKEN = "test-write-token-with-sufficient-entropy"
+WRITE_CREDENTIAL = ApiCredential.from_token(
+    "test-writer",
+    WRITE_TOKEN,
+    {"cases:read", "cases:write", "ops:read"},
+)
 
 
 def batch(request_id: str = "batch-001", case_id: str = "API-001") -> dict[str, object]:
@@ -41,7 +50,9 @@ def batch(request_id: str = "batch-001", case_id: str = "API-001") -> dict[str, 
 
 def client_for(tmp_path: Path) -> tuple[TestClient, Path]:
     database = tmp_path / "api.db"
-    return TestClient(create_app(database)), database
+    client = TestClient(create_app(database, credentials=(WRITE_CREDENTIAL,)))
+    client.headers["Authorization"] = f"Bearer {WRITE_TOKEN}"
+    return client, database
 
 
 def test_health_and_readiness_include_correlation_id(tmp_path) -> None:
@@ -53,6 +64,53 @@ def test_health_and_readiness_include_correlation_id(tmp_path) -> None:
     assert live.headers["x-request-id"] == "trace-123"
     assert ready.json() == {"status": "ready", "detail": "ready"}
     assert ready.headers["x-request-id"]
+
+
+def test_health_endpoints_remain_public_for_orchestrators(tmp_path) -> None:
+    app = create_app(tmp_path / "public-health.db", credentials=(WRITE_CREDENTIAL,))
+    public = TestClient(app)
+
+    assert public.get("/health/live").status_code == 200
+    assert public.get("/health/ready").status_code == 200
+
+
+def test_protected_routes_reject_missing_invalid_and_under_scoped_tokens(tmp_path) -> None:
+    read_token = "read-only-token-with-sufficient-entropy"
+    read_credential = ApiCredential.from_token("test-reader", read_token, {"cases:read"})
+    app = create_app(tmp_path / "protected.db", credentials=(WRITE_CREDENTIAL, read_credential))
+    anonymous = TestClient(app)
+
+    missing = anonymous.post("/v1/case-batches", json=batch())
+    invalid = anonymous.get("/v1/cases", headers={"Authorization": "Bearer definitely-not-valid"})
+    forbidden = anonymous.post(
+        "/v1/case-batches",
+        json=batch(),
+        headers={"Authorization": f"Bearer {read_token}"},
+    )
+    allowed = anonymous.get("/v1/cases", headers={"Authorization": f"Bearer {read_token}"})
+
+    assert missing.status_code == 401
+    assert missing.headers["www-authenticate"] == "Bearer"
+    assert invalid.status_code == 401
+    assert forbidden.status_code == 403
+    assert forbidden.json()["detail"] == "required scope: cases:write"
+    assert allowed.status_code == 200
+
+
+def test_expired_token_is_rejected(tmp_path) -> None:
+    token = "expired-token-with-sufficient-entropy"
+    expired = ApiCredential.from_token(
+        "expired-client",
+        token,
+        {"cases:read"},
+        expires_at=datetime.now(UTC) - timedelta(minutes=1),
+    )
+    client = TestClient(create_app(tmp_path / "expired.db", credentials=(expired,)))
+
+    response = client.get("/v1/cases", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "invalid or expired bearer credential"
 
 
 def test_ingestion_commits_case_event_and_receipt_atomically(tmp_path) -> None:
@@ -139,3 +197,19 @@ def test_prometheus_metrics_track_commits_replays_and_conflicts(tmp_path) -> Non
     assert "civicflow_ingested_events_total 1" in metrics
     assert "civicflow_ingestion_replays_total 1" in metrics
     assert "civicflow_ingestion_conflicts_total 1" in metrics
+
+
+def test_auth_failure_metrics_use_only_bounded_reason_labels(tmp_path) -> None:
+    read_token = "metrics-reader-token-with-sufficient-entropy"
+    read_credential = ApiCredential.from_token("metrics-reader", read_token, {"cases:read"})
+    app = create_app(tmp_path / "auth-metrics.db", credentials=(WRITE_CREDENTIAL, read_credential))
+    client = TestClient(app)
+    client.get("/v1/cases")
+    client.get("/v1/cases", headers={"Authorization": "Bearer invalid"})
+    client.get("/metrics", headers={"Authorization": f"Bearer {read_token}"})
+    metrics = client.get("/metrics", headers={"Authorization": f"Bearer {WRITE_TOKEN}"}).text
+
+    assert 'civicflow_auth_failures_total{reason="missing"} 1' in metrics
+    assert 'civicflow_auth_failures_total{reason="invalid"} 1' in metrics
+    assert 'civicflow_auth_failures_total{reason="insufficient_scope"} 1' in metrics
+    assert "metrics-reader" not in metrics
