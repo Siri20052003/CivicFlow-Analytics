@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["build>=1.2,<2", "httpx>=0.28,<1", "pytest>=8.3", "ruff>=0.8"]
+postgres = ["psycopg[binary]>=3.2,<4"]
 
 [project.scripts]
 civicflow = "civicflow.cli:main"
@@ -29,6 +30,7 @@ civicflow-dashboard = "civicflow.dashboard:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/civicflow"]
+artifacts = ["src/civicflow/migrations/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

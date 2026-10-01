@@ -8,7 +8,7 @@ RUN groupadd --system civicflow && useradd --system --gid civicflow --create-hom
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[postgres]"
 
 RUN mkdir -p /home/civicflow/data && chown civicflow:civicflow /home/civicflow/data
 USER civicflow

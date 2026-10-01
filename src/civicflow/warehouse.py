@@ -76,7 +76,7 @@ def initialize_warehouse(database: Path) -> None:
         connection.executescript(SCHEMA)
 
 
-def _payload_fingerprint(cases: list[ServiceCase], events: list[CaseStatusEvent]) -> str:
+def payload_fingerprint(cases: list[ServiceCase], events: list[CaseStatusEvent]) -> str:
     payload = {
         "cases": [case.to_record() for case in cases],
         "events": [event.to_record() for event in events],
@@ -95,7 +95,7 @@ def ingest_case_batch(
     validate_cases(cases)
     validate_status_events(cases, events)
     initialize_warehouse(database)
-    fingerprint = _payload_fingerprint(cases, events)
+    fingerprint = payload_fingerprint(cases, events)
     try:
         with sqlite3.connect(database, timeout=15) as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -114,11 +114,11 @@ def ingest_case_batch(
 
             connection.executemany(
                 """INSERT INTO dim_case VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                [_case_row(case) for case in cases],
+                [case_row(case) for case in cases],
             )
             connection.executemany(
                 """INSERT INTO fact_case_status_event VALUES (?, ?, ?, ?, ?, ?)""",
-                [_event_row(event) for event in events],
+                [event_row(event) for event in events],
             )
             connection.execute(
                 """INSERT INTO ingestion_receipt VALUES (?, ?, ?, ?, ?)""",
@@ -136,7 +136,7 @@ def ingest_case_batch(
     return IngestionResult(request_id, len(cases), len(events), replayed=False)
 
 
-def _case_row(case: ServiceCase) -> tuple[object, ...]:
+def case_row(case: ServiceCase) -> tuple[object, ...]:
     return (
         case.case_id,
         case.opened_at.isoformat(),
@@ -152,7 +152,7 @@ def _case_row(case: ServiceCase) -> tuple[object, ...]:
     )
 
 
-def _event_row(event: CaseStatusEvent) -> tuple[object, ...]:
+def event_row(event: CaseStatusEvent) -> tuple[object, ...]:
     return (
         event.event_id,
         event.case_id,
@@ -176,9 +176,9 @@ def load_warehouse(database: Path, cases: list[ServiceCase], events: list[CaseSt
             connection.execute("DELETE FROM dim_case")
             connection.executemany(
                 """INSERT INTO dim_case VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                [_case_row(case) for case in cases],
+                [case_row(case) for case in cases],
             )
             connection.executemany(
                 """INSERT INTO fact_case_status_event VALUES (?, ?, ?, ?, ?, ?)""",
-                [_event_row(event) for event in events],
+                [event_row(event) for event in events],
             )

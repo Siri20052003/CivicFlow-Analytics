@@ -41,7 +41,9 @@ No real resident information is used. All records are synthetic and generated lo
 - Leakage-safe rolling forecast backtests with MAE, WAPE, bias, and planning coverage
 - Department capacity gaps, expected utilization, and executive baseline/surge/assurance comparisons
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
+- Versioned PostgreSQL migrations and a backend-neutral API store for horizontal scaling
 - Atomic batch-ingestion API with bounded contracts, durable idempotency keys, and conflict detection
+- Cross-replica idempotency locks with real PostgreSQL concurrency validation in CI
 - Fail-closed bearer authentication with hashed, expiring credentials and least-privilege route scopes
 - Liveness/readiness probes, correlation IDs, Prometheus metrics, and a concurrent load probe
 - Filter-aware case and lifecycle extracts with SHA-256 checksums and a governance manifest
@@ -105,9 +107,17 @@ curl http://localhost:8000/health/ready
 curl -H "Authorization: Bearer $CIVICFLOW_API_KEY" http://localhost:8000/v1/cases
 ```
 
+For a multi-replica deployment, install the PostgreSQL extra and provide a connection URL. Startup applies each versioned migration once under a database advisory lock:
+
+```bash
+python -m pip install -e ".[postgres]"
+export CIVICFLOW_DATABASE_URL='postgresql://civicflow:secret@localhost:5432/civicflow'
+civicflow-api
+```
+
 `POST /v1/case-batches` accepts one to 1,000 case snapshots and their complete lifecycle histories. Each request supplies a durable `request_id`. Repeating the identical request returns `200` without duplicating rows; reusing the key for changed content, or sending already-stored entity IDs under a new key, returns `409`. Domain-invalid histories return `422` before any rows are committed.
 
-The service exposes bounded reads at `GET /v1/cases`, OpenAPI documentation at `/docs`, and Prometheus text metrics at `/metrics`. Case reads, writes, and metrics require `cases:read`, `cases:write`, and `ops:read`, respectively. Configuration accepts token digests rather than plaintext secrets, supports expiration and overlap-based rotation, and records only bounded failure reasons in telemetry. Every response carries an `x-request-id`; a valid incoming value is preserved for cross-service tracing. See [deployment guidance](docs/deployment.md) for credential rotation, persistence, gateway, monitoring, and scaling boundaries.
+The service exposes bounded reads at `GET /v1/cases`, OpenAPI documentation at `/docs`, and Prometheus text metrics at `/metrics`. Case reads, writes, and metrics require `cases:read`, `cases:write`, and `ops:read`, respectively. Configuration accepts token digests rather than plaintext secrets, supports expiration and overlap-based rotation, and records only bounded failure reasons in telemetry. Every response carries an `x-request-id`; a valid incoming value is preserved for cross-service tracing. See [deployment guidance](docs/deployment.md) for credential rotation, schema migration, persistence, monitoring, and scaling boundaries.
 
 Run the repeatable live probe after starting the API:
 
@@ -179,9 +189,9 @@ This is a planning model, not an automated hiring recommendation. Before real us
 
 ## Roadmap
 
-- Add a PostgreSQL storage adapter with migration and multi-replica concurrency tests
 - Add forecast monitoring thresholds and approved assumption-change audit history
 - Add scheduled briefing snapshots with approved retention controls
+- Add disaster-recovery rehearsal automation for PostgreSQL backups
 
 ## Responsible use
 

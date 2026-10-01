@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import re
-import sqlite3
 import threading
 import time
 from collections import defaultdict
@@ -25,12 +24,9 @@ from civicflow.auth import (
     load_api_credentials,
 )
 from civicflow.model import CaseStatusEvent, Department, Priority, ServiceCase, Status
+from civicflow.store import CaseStore, build_case_store
 from civicflow.validation import ValidationError
-from civicflow.warehouse import (
-    IngestionConflict,
-    ingest_case_batch,
-    initialize_warehouse,
-)
+from civicflow.warehouse import IngestionConflict
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 BEARER_SECURITY = HTTPBearer(
@@ -174,41 +170,26 @@ class ApiMetrics:
         return "\n".join(lines) + "\n"
 
 
-def _database_is_ready(database: Path) -> tuple[bool, str]:
-    try:
-        with sqlite3.connect(f"file:{database}?mode=rw", uri=True, timeout=2) as connection:
-            connection.execute("SELECT 1").fetchone()
-            tables = {
-                row[0]
-                for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'table'"
-                ).fetchall()
-            }
-    except sqlite3.Error as error:
-        return False, str(error)
-    required = {"dim_case", "fact_case_status_event", "ingestion_receipt"}
-    missing = sorted(required - tables)
-    return (False, f"missing tables: {', '.join(missing)}") if missing else (True, "ready")
-
-
 def create_app(
     database: Path | None = None,
     credentials: tuple[ApiCredential, ...] | None = None,
+    store: CaseStore | None = None,
 ) -> FastAPI:
     """Build an isolated app instance for production or tests."""
-    database = database or Path(os.environ.get("CIVICFLOW_DB", "data/generated/civicflow.db"))
     configured_credentials = credentials or load_api_credentials(
         os.environ.get("CIVICFLOW_API_KEYS", "")
     )
     authenticator = ApiAuthenticator(configured_credentials)
-    initialize_warehouse(database)
+    case_store = store or build_case_store(database)
+    case_store.initialize()
     metrics = ApiMetrics()
     app = FastAPI(
         title="CivicFlow Ingestion API",
         version="1.0.0",
         description="Validated and idempotent municipal service-case ingestion.",
     )
-    app.state.database = database
+    app.state.store = case_store
+    app.state.database_backend = case_store.backend_name
     app.state.metrics = metrics
     app.state.authenticator = authenticator
 
@@ -274,7 +255,7 @@ def create_app(
 
     @app.get("/health/ready", tags=["operations"])
     def readiness(response: Response) -> dict[str, str]:
-        ready, detail = _database_is_ready(database)
+        ready, detail = case_store.readiness()
         if not ready:
             response.status_code = 503
         return {"status": "ready" if ready else "unavailable", "detail": detail}
@@ -300,8 +281,7 @@ def create_app(
         response: Response,
     ) -> IngestionResponse:
         try:
-            result = ingest_case_batch(
-                database,
+            result = case_store.ingest(
                 payload.request_id,
                 [case.to_domain() for case in payload.cases],
                 [event.to_domain() for event in payload.events],
@@ -328,15 +308,8 @@ def create_app(
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> dict[str, object]:
-        with sqlite3.connect(database) as connection:
-            connection.row_factory = sqlite3.Row
-            total = connection.execute("SELECT COUNT(*) FROM current_case_state").fetchone()[0]
-            rows = connection.execute(
-                """SELECT * FROM current_case_state
-                ORDER BY opened_at DESC, case_id LIMIT ? OFFSET ?""",
-                (limit, offset),
-            ).fetchall()
-        return {"total": total, "items": [dict(row) for row in rows]}
+        total, rows = case_store.list_cases(limit, offset)
+        return {"total": total, "items": rows}
 
     return app
 

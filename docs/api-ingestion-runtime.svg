@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
   <title id="title">CivicFlow API ingestion runtime</title>
-  <desc id="desc">Authenticated case batches pass through scoped authorization, a validated API contract, and an atomic idempotent transaction into the operations warehouse, with protected metrics and public health signals sent to monitoring.</desc>
+  <desc id="desc">Authenticated case batches pass through scoped authorization, a validated API contract, and a backend-neutral atomic transaction into SQLite or multi-replica PostgreSQL, with protected metrics and public health signals sent to monitoring.</desc>
   <rect width="1200" height="620" rx="28" fill="#071827"/>
   <text x="70" y="72" fill="#f8fafc" font-family="Arial, sans-serif" font-size="34" font-weight="700">CivicFlow ingestion runtime</text>
   <text x="70" y="108" fill="#9fb5c7" font-family="Arial, sans-serif" font-size="18">Hashed service auth • bounded contracts • durable replay safety • observable operations</text>
@@ -18,12 +18,12 @@
     <text x="395" y="335" fill="#c8d7e3" font-size="16">Lifecycle + correlation checks</text>
     <text x="395" y="361" fill="#c8d7e3" font-size="16">401 / 403 / 409 / 422</text>
     <rect x="710" y="160" width="260" height="230" rx="18" fill="#12324a" stroke="#34d399" stroke-width="2"/>
-    <text x="735" y="205" fill="#6ee7b7" font-size="17" font-weight="700">SQLITE TRANSACTION</text>
-    <text x="735" y="248" fill="#f8fafc" font-size="23" font-weight="700">Atomic append</text>
-    <text x="735" y="283" fill="#c8d7e3" font-size="16">BEGIN IMMEDIATE</text>
-    <text x="735" y="309" fill="#c8d7e3" font-size="16">Case + event foreign keys</text>
-    <text x="735" y="335" fill="#c8d7e3" font-size="16">Payload fingerprint receipt</text>
-    <text x="735" y="361" fill="#c8d7e3" font-size="16">Exact replay returns safely</text>
+    <text x="735" y="205" fill="#6ee7b7" font-size="17" font-weight="700">DURABLE TRANSACTION</text>
+    <text x="735" y="248" fill="#f8fafc" font-size="23" font-weight="700">Portable case store</text>
+    <text x="735" y="283" fill="#c8d7e3" font-size="16">SQLite local runtime</text>
+    <text x="735" y="309" fill="#c8d7e3" font-size="16">PostgreSQL multi-replica</text>
+    <text x="735" y="335" fill="#c8d7e3" font-size="16">Versioned schema migration</text>
+    <text x="735" y="361" fill="#c8d7e3" font-size="16">Advisory replay locking</text>
     <rect x="1030" y="190" width="110" height="170" rx="18" fill="#12324a" stroke="#fbbf24" stroke-width="2"/>
     <text x="1052" y="235" fill="#fde68a" font-size="15" font-weight="700">QUERY</text>
     <text x="1052" y="278" fill="#f8fafc" font-size="18" font-weight="700">Current</text>

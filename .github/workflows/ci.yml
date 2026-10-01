@@ -11,6 +11,20 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: civicflow_test
+          POSTGRES_USER: civicflow
+          POSTGRES_PASSWORD: civicflow-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U civicflow -d civicflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,10 +32,14 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[dev]"
+      - run: python -m pip install -e ".[dev,postgres]"
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
+      - name: PostgreSQL migration and multi-replica semantics
+        env:
+          CIVICFLOW_TEST_POSTGRES_URL: postgresql://civicflow:civicflow-test-password@127.0.0.1:5432/civicflow_test
+        run: pytest -q tests/test_postgres_integration.py
       - run: python -m build --wheel
       - name: Reproducible pipeline smoke test
         run: civicflow --cases 5000 --seed 20260922 --output-dir /tmp/civicflow
