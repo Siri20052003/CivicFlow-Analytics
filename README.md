@@ -38,6 +38,7 @@ No real resident information is used. All records are synthetic and generated lo
 - Calibrated probabilities, interpretable feature effects, top-decile recall, and drift monitoring
 - Configurable staffing scenarios with demand, service-level, effort, shrinkage, and cost assumptions
 - Department-specific staffing assumptions stored in a validated, reviewable configuration file
+- Policy-based forecast monitoring and tamper-evident synthetic assumption approvals
 - Leakage-safe rolling forecast backtests with MAE, WAPE, bias, and planning coverage
 - Department capacity gaps, expected utilization, and executive baseline/surge/assurance comparisons
 - Transactional SQLite warehouse with case dimensions, status-event facts, indexes, and a current-state view
@@ -183,13 +184,14 @@ Direct-work hours come from documented synthetic service-type assumptions, not e
 
 The CLI loads the packaged `src/civicflow/staffing_assumptions.json`, where every department declares current FTE, scheduled hours, non-casework time, loaded annual cost, and an effort multiplier. The loader rejects missing, extra, or out-of-range fields before planning begins. This keeps workforce assumptions reviewable and versioned rather than embedded in dashboard code.
 
+Forecast governance is also executable. The CLI evaluates overall and department backtests against packaged WAPE, bias, coverage, and sample-window thresholds, then writes `forecast_monitoring_report.json`. It independently verifies that the active assumptions match the latest entry in a sequential SHA-256 audit chain and writes `assumption_audit_report.json`. Any failed forecast check is surfaced as `action_required`; any broken audit chain fails the pipeline. See [forecast governance](docs/forecast-governance.md) for the control boundaries and synthetic-approval disclaimer.
+
 Forecast accuracy uses four rolling one-week-ahead evaluations. Each origin trains only on the preceding eight complete weeks, so no future intake enters an earlier forecast. Mean absolute error reports the typical weekly miss in cases; weighted absolute percentage error scales total error by actual demand; signed bias reveals systematic over- or under-forecasting; and planning coverage reports how often the service-level buffer met or exceeded observed arrivals. These synthetic results demonstrate governance mechanics, not expected production accuracy.
 
 This is a planning model, not an automated hiring recommendation. Before real use, an agency should replace every effort, staffing, shrinkage, and cost assumption with approved workforce data; compare forecasts with schedule coverage and skill constraints; and require finance, labor, and service leadership review.
 
 ## Roadmap
 
-- Add forecast monitoring thresholds and approved assumption-change audit history
 - Add scheduled briefing snapshots with approved retention controls
 - Add disaster-recovery rehearsal automation for PostgreSQL backups
 

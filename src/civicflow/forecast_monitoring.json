@@ -1,0 +1,6 @@
+{
+  "maximum_wape": 0.15,
+  "maximum_absolute_bias": 3.0,
+  "minimum_planning_coverage": 0.85,
+  "minimum_validation_weeks": 4
+}

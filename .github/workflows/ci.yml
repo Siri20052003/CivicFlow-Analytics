@@ -89,6 +89,16 @@ jobs:
           assert len(backtest['departments']) == 5
           assert 0 <= backtest['planning_coverage_rate'] <= 1
           assert all(row['validation_weeks'] == 4 for row in backtest['departments'])
+          with open('/tmp/civicflow/forecast_monitoring_report.json') as handle:
+              monitoring = json.load(handle)
+          assert monitoring['status'] in {'pass', 'action_required'}
+          assert len(monitoring['checks']) == 4
+          assert len(monitoring['departments']) == 5
+          with open('/tmp/civicflow/assumption_audit_report.json') as handle:
+              audit = json.load(handle)
+          assert audit['status'] == 'verified'
+          assert audit['current_assumptions_match'] is True
+          assert audit['versions'] >= 2
           PY
       - name: Validate portfolio visuals
         run: |

@@ -30,7 +30,11 @@ civicflow-dashboard = "civicflow.dashboard:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/civicflow"]
-artifacts = ["src/civicflow/migrations/*.sql"]
+artifacts = [
+    "src/civicflow/*.json",
+    "src/civicflow/*.jsonl",
+    "src/civicflow/migrations/*.sql",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

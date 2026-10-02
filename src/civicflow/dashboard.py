@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from civicflow.geography import MIN_CLOSED_CASES, district_metric_from_counts
+from civicflow.governance import evaluate_forecast_monitoring, load_monitoring_thresholds
 from civicflow.prediction import (
     PredictionReport,
     score_open_cases_frame,
@@ -233,6 +234,10 @@ def render() -> None:
     staffing_accuracy, staffing_accuracy_table = build_staffing_accuracy_view(
         cases, departments=departments
     )
+    monitoring = evaluate_forecast_monitoring(
+        staffing_accuracy,
+        load_monitoring_thresholds(Path(__file__).with_name("forecast_monitoring.json")),
+    )
     prediction, risk_scores, feature_effects = build_risk_view(cases, filtered_cases)
     brief = build_executive_brief(
         kpis,
@@ -328,6 +333,11 @@ def render() -> None:
         )
         accuracy_columns[3].metric(
             "Planning coverage", f"{staffing_accuracy.planning_coverage_rate:.1%}"
+        )
+        st.metric(
+            "Monitoring decision",
+            monitoring.status.replace("_", " ").title(),
+            help="All overall and department thresholds must pass.",
         )
         st.dataframe(staffing_accuracy_table, width="stretch", hide_index=True)
 

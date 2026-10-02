@@ -10,6 +10,11 @@ import joblib
 
 from civicflow.analytics import build_backlog_report, build_sla_report
 from civicflow.geography import build_district_service_report
+from civicflow.governance import (
+    evaluate_forecast_monitoring,
+    load_monitoring_thresholds,
+    verify_assumption_history,
+)
 from civicflow.io import write_cases_csv, write_dataclass_json, write_report_json
 from civicflow.prediction import cases_to_frame, score_open_cases_frame, train_sla_risk_model
 from civicflow.staffing import (
@@ -59,6 +64,14 @@ def main() -> None:
     staffing_backtest = build_staffing_backtest_frame(
         case_frame, StaffingScenario(name="Historical accuracy", history_weeks=8)
     )
+    package_dir = Path(__file__).parent
+    monitoring = evaluate_forecast_monitoring(
+        staffing_backtest,
+        load_monitoring_thresholds(package_dir / "forecast_monitoring.json"),
+    )
+    assumption_audit = verify_assumption_history(
+        package_dir / "staffing_assumption_history.jsonl", department_assumptions
+    )
     write_cases_csv(cases, args.output_dir / "service_cases.csv")
     write_report_json(report, args.output_dir / "sla_report.json")
     write_report_json(backlog, args.output_dir / "backlog_report.json")
@@ -68,6 +81,8 @@ def main() -> None:
     write_dataclass_json(prediction_report, args.output_dir / "sla_prediction_report.json")
     write_dataclass_json(staffing_suite, args.output_dir / "staffing_scenario_report.json")
     write_dataclass_json(staffing_backtest, args.output_dir / "staffing_backtest_report.json")
+    write_dataclass_json(monitoring, args.output_dir / "forecast_monitoring_report.json")
+    write_dataclass_json(assumption_audit, args.output_dir / "assumption_audit_report.json")
     open_risk_scores.to_csv(args.output_dir / "open_case_risk_scores.csv", index=False)
     joblib.dump(risk_model, args.output_dir / "sla_risk_model.joblib")
     load_warehouse(args.output_dir / "civicflow.db", cases, events)
