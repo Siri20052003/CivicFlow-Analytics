@@ -100,6 +100,25 @@ jobs:
           assert audit['current_assumptions_match'] is True
           assert audit['versions'] >= 2
           PY
+      - name: Validate immutable briefing snapshot
+        run: |
+          civicflow-snapshot \
+            --source-dir /tmp/civicflow \
+            --snapshot-dir /tmp/civicflow-snapshots \
+            --as-of 2026-10-03T13:00:00Z
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from civicflow.snapshots import verify_snapshot
+          root = Path('/tmp/civicflow-snapshots')
+          snapshots = [path for path in root.iterdir() if path.is_dir()]
+          assert len(snapshots) == 1
+          manifest = verify_snapshot(snapshots[0])
+          assert manifest['synthetic_data'] is True
+          report = json.loads((root / 'retention-report.json').read_text())
+          assert report['mode'] == 'dry_run'
+          assert report['deleted_snapshot_ids'] == []
+          PY
       - name: Validate portfolio visuals
         run: |
           python - <<'PY'

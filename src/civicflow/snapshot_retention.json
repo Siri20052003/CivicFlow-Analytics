@@ -1,0 +1,4 @@
+{
+  "retention_days": 90,
+  "minimum_snapshots": 12
+}

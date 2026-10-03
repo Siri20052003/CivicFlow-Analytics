@@ -49,6 +49,7 @@ No real resident information is used. All records are synthetic and generated lo
 - Liveness/readiness probes, correlation IDs, Prometheus metrics, and a concurrent load probe
 - Filter-aware case and lifecycle extracts with SHA-256 checksums and a governance manifest
 - Self-contained, print-ready executive briefings with reconciled KPIs and leadership actions
+- Atomic executive evidence snapshots with SHA-256 verification and policy-based retention
 - Interactive dashboard with operational KPIs, cohort trends, and a filter-aware risk queue
 - Stable CSV case output and JSON metric output
 - Installable CLI, non-root Docker runtime, CI quality gates, and automated tests
@@ -81,6 +82,14 @@ Generated artifacts:
 - `data/generated/staffing_scenario_report.json`: reconciled baseline, surge, and high-assurance staffing plans
 - `data/generated/staffing_backtest_report.json`: rolling department and citywide forecast accuracy
 - `data/generated/civicflow.db`: relational case and lifecycle-event warehouse
+
+Create an immutable briefing snapshot after a successful pipeline run. Retention is dry-run by default:
+
+```bash
+civicflow-snapshot --source-dir data/generated --snapshot-dir data/snapshots
+```
+
+Each UTC-named snapshot contains a self-contained executive briefing, the governed staffing and model reports, and a checksum manifest. The packaged policy retains 90 days while always protecting the newest 12 snapshots. Explicit `--apply-retention` is required before eligible, integrity-verified snapshots are removed. See [snapshot retention](docs/snapshot-retention.md) for scheduling, storage, and review guidance.
 
 ## Interactive dashboard
 
@@ -192,7 +201,6 @@ This is a planning model, not an automated hiring recommendation. Before real us
 
 ## Roadmap
 
-- Add scheduled briefing snapshots with approved retention controls
 - Add disaster-recovery rehearsal automation for PostgreSQL backups
 
 ## Responsible use

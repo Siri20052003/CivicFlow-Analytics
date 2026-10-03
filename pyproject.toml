@@ -27,6 +27,7 @@ postgres = ["psycopg[binary]>=3.2,<4"]
 civicflow = "civicflow.cli:main"
 civicflow-api = "civicflow.api:run"
 civicflow-dashboard = "civicflow.dashboard:main"
+civicflow-snapshot = "civicflow.snapshot_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/civicflow"]
