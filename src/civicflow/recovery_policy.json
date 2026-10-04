@@ -1,0 +1,5 @@
+{
+  "maximum_recovery_seconds": 120,
+  "maximum_recovery_point_age_seconds": 300,
+  "required_migration_version": 1
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -8,6 +9,7 @@ from datetime import UTC, datetime
 import pytest
 
 from civicflow.postgres_store import MIGRATION_VERSION, PostgresCaseStore
+from civicflow.recovery import RecoveryPolicy, run_recovery_rehearsal
 from civicflow.synthetic import generate_cases, generate_status_events
 from civicflow.warehouse import IngestionConflict
 
@@ -72,3 +74,38 @@ def test_changed_payload_reusing_key_is_rejected(store: PostgresCaseStore) -> No
 
     with pytest.raises(IngestionConflict, match="different payload"):
         store.ingest("immutable-request", changed, events)
+
+
+@pytest.mark.skipif(
+    shutil.which("pg_dump") is None or shutil.which("pg_restore") is None,
+    reason="PostgreSQL client tools are not configured",
+)
+def test_backup_restoration_rehearsal_reconciles_and_cleans_up(
+    store: PostgresCaseStore, tmp_path
+) -> None:
+    import psycopg
+
+    assert DATABASE_URL is not None
+    cases = generate_cases(7, seed=103, as_of=AS_OF)
+    events = generate_status_events(cases, as_of=AS_OF)
+    store.ingest("recovery-rehearsal", cases, events)
+    report = run_recovery_rehearsal(
+        DATABASE_URL,
+        tmp_path / "civicflow.dump",
+        RecoveryPolicy(120, 300, MIGRATION_VERSION),
+        rehearsal_database="civicflow_rehearsal_integration",
+        started_at=AS_OF,
+    )
+
+    assert report.status == "pass"
+    assert report.cleanup_status == "dropped"
+    assert report.backup_bytes > 0
+    assert report.source_tables == report.restored_tables
+    assert report.source_tables["dim_case"].rows == 7
+    assert report.source_tables["fact_case_status_event"].rows == len(events)
+    with psycopg.connect(DATABASE_URL) as connection:
+        exists = connection.execute(
+            "SELECT 1 FROM pg_database WHERE datname = %s",
+            (report.rehearsal_database,),
+        ).fetchone()
+    assert exists is None

@@ -33,13 +33,31 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev,postgres]"
+      - name: Install PostgreSQL client tools
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
-      - name: PostgreSQL migration and multi-replica semantics
+      - name: PostgreSQL migration, concurrency, and recovery rehearsal
         env:
           CIVICFLOW_TEST_POSTGRES_URL: postgresql://civicflow:civicflow-test-password@127.0.0.1:5432/civicflow_test
-        run: pytest -q tests/test_postgres_integration.py
+          CIVICFLOW_DATABASE_URL: postgresql://civicflow:civicflow-test-password@127.0.0.1:5432/civicflow_test
+        run: |
+          pytest -q tests/test_postgres_integration.py
+          civicflow-recovery \
+            --backup-path /tmp/civicflow-recovery.dump \
+            --report-path /tmp/civicflow-recovery-report.json \
+            --rehearsal-database civicflow_rehearsal_ci
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/civicflow-recovery-report.json').read_text())
+          assert report['status'] == 'pass'
+          assert report['cleanup_status'] == 'dropped'
+          assert report['source_tables'] == report['restored_tables']
+          assert report['backup_bytes'] == Path('/tmp/civicflow-recovery.dump').stat().st_size
+          assert all(check['status'] == 'pass' for check in report['checks'])
+          PY
       - run: python -m build --wheel
       - name: Reproducible pipeline smoke test
         run: civicflow --cases 5000 --seed 20260922 --output-dir /tmp/civicflow

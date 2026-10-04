@@ -41,10 +41,10 @@ Credentials may carry `cases:read`, `cases:write`, and `ops:read`. Configure ove
 2. Validate agency SSO/OIDC at that gateway, map approved machine identities to narrowly scoped service credentials, and rotate credentials from a managed secret store.
 3. Forward or generate `x-request-id` and collect application logs alongside the gateway access log. Never log Authorization headers or plaintext tokens.
 4. Scrape the protected `/metrics` endpoint with a dedicated `ops:read` credential. Alert on readiness failures, authentication failures, elevated `409` conflicts, and HTTP error-rate changes.
-5. Back up the database volume and test restoration before accepting authoritative records.
+5. Back up the database and run the governed restoration rehearsal before accepting authoritative records. Archive the resulting recovery report in the approved audit system.
 
 SQLite uses `BEGIN IMMEDIATE` to serialize writers and protect idempotency receipts, so run one API replica per SQLite volume. PostgreSQL uses per-request advisory transaction locks and database uniqueness constraints for multi-replica safety. The CI integration test launches 12 concurrent writers against one idempotency key and requires exactly one commit plus 11 safe replays.
 
 ## Release verification
 
-The CI workflow executes linting, formatting, unit and authenticated API integration tests, a real PostgreSQL migration/concurrency suite, a 5,000-case analytical pipeline, dashboard health validation, a 250-request authenticated API probe with exact replay checks, and both dashboard and API container builds. Deployment should pin an image digest produced from a passing `main` commit and roll back if readiness does not stabilize.
+The CI workflow executes linting, formatting, unit and authenticated API integration tests, a real PostgreSQL migration/concurrency and backup-restoration suite, a 5,000-case analytical pipeline, dashboard health validation, a 250-request authenticated API probe with exact replay checks, and both dashboard and API container builds. Deployment should pin an image digest produced from a passing `main` commit and roll back if readiness does not stabilize. See the [disaster-recovery runbook](disaster-recovery.md) for the rehearsal contract and recovery evidence.

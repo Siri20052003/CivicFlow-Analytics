@@ -45,6 +45,7 @@ No real resident information is used. All records are synthetic and generated lo
 - Versioned PostgreSQL migrations and a backend-neutral API store for horizontal scaling
 - Atomic batch-ingestion API with bounded contracts, durable idempotency keys, and conflict detection
 - Cross-replica idempotency locks with real PostgreSQL concurrency validation in CI
+- Verified PostgreSQL backup/restore rehearsals with measured recovery objectives
 - Fail-closed bearer authentication with hashed, expiring credentials and least-privilege route scopes
 - Liveness/readiness probes, correlation IDs, Prometheus metrics, and a concurrent load probe
 - Filter-aware case and lifecycle extracts with SHA-256 checksums and a governance manifest
@@ -129,6 +130,8 @@ civicflow-api
 
 The service exposes bounded reads at `GET /v1/cases`, OpenAPI documentation at `/docs`, and Prometheus text metrics at `/metrics`. Case reads, writes, and metrics require `cases:read`, `cases:write`, and `ops:read`, respectively. Configuration accepts token digests rather than plaintext secrets, supports expiration and overlap-based rotation, and records only bounded failure reasons in telemetry. Every response carries an `x-request-id`; a valid incoming value is preserved for cross-service tracing. See [deployment guidance](docs/deployment.md) for credential rotation, schema migration, persistence, monitoring, and scaling boundaries.
 
+The recovery workflow creates a native PostgreSQL backup, restores it into a safely namespaced disposable database, reconciles row counts and deterministic content hashes, measures recovery time and recovery-point age, then removes the rehearsal database. See the [disaster-recovery runbook](docs/disaster-recovery.md).
+
 Run the repeatable live probe after starting the API:
 
 ```bash
@@ -201,7 +204,7 @@ This is a planning model, not an automated hiring recommendation. Before real us
 
 ## Roadmap
 
-- Add disaster-recovery rehearsal automation for PostgreSQL backups
+- Begin WorkforcePulse AI with realistic workforce data contracts and forecasting foundations
 
 ## Responsible use
 
